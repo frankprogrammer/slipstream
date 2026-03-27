@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
+import { TrafficSpawner } from '../engine/TrafficSpawner';
 
 /**
  * GameScene — The single gameplay screen.
@@ -27,11 +28,9 @@ export class GameScene extends Phaser.Scene {
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private player!: Phaser.GameObjects.Rectangle;
+  private trafficSpawner!: TrafficSpawner;
 
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
-  private trafficVehicles: Phaser.GameObjects.Rectangle[] = [];
-  private trafficSpeeds: number[] = [];
-  private spawnAccumulatorMs = 0;
 
   private roadLeft = 0;
   private roadWidth = 0;
@@ -67,6 +66,8 @@ export class GameScene extends Phaser.Scene {
 
     this.createLaneDashes(height);
     this.createPlayer(height);
+    this.trafficSpawner = new TrafficSpawner(this, this.laneCenters);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.trafficSpawner.destroy());
 
     this.cursors = this.input.keyboard?.createCursorKeys() as Phaser.Types.Input.Keyboard.CursorKeys;
     this.registerSwipeInput();
@@ -77,7 +78,7 @@ export class GameScene extends Phaser.Scene {
 
     this.handleLaneInput();
     this.scrollRoad(delta);
-    this.updateTraffic(delta);
+    this.trafficSpawner.update(delta);
   }
 
   private createLaneDashes(height: number): void {
@@ -179,41 +180,5 @@ export class GameScene extends Phaser.Scene {
         dash.y = -this.dashLength;
       }
     }
-  }
-
-  private updateTraffic(delta: number): void {
-    const speedScale = delta / (1000 / 60);
-    this.spawnAccumulatorMs += delta;
-
-    const spawnRate = CONFIG.TRAFFIC_PHASES[0].spawnRate;
-    while (this.spawnAccumulatorMs >= spawnRate) {
-      this.spawnAccumulatorMs -= spawnRate;
-      this.spawnTrafficVehicle();
-    }
-
-    for (let i = this.trafficVehicles.length - 1; i >= 0; i -= 1) {
-      const vehicle = this.trafficVehicles[i];
-      vehicle.y += this.trafficSpeeds[i] * speedScale;
-
-      if (vehicle.y - vehicle.height / 2 > this.scale.height + 24) {
-        vehicle.destroy();
-        this.trafficVehicles.splice(i, 1);
-        this.trafficSpeeds.splice(i, 1);
-      }
-    }
-  }
-
-  private spawnTrafficVehicle(): void {
-    const laneIndex = Phaser.Math.Between(0, CONFIG.LANE_COUNT - 1);
-    const width = CONFIG.LANE_WIDTH * Phaser.Math.FloatBetween(0.5, 0.68);
-    const height = Phaser.Math.Between(70, 95);
-    const speed = Phaser.Math.FloatBetween(2.2, 4.2);
-
-    const vehicle = this.add
-      .rectangle(this.laneCenters[laneIndex], -height, width, height, CONFIG.PALETTE.SOFT_BROWN)
-      .setStrokeStyle(2, CONFIG.PALETTE.CREAM);
-
-    this.trafficVehicles.push(vehicle);
-    this.trafficSpeeds.push(speed);
   }
 }
