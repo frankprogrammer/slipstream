@@ -27,8 +27,8 @@ export const CONFIG = {
 
   // ── Scrolling ──
   BASE_SCROLL_SPEED: 4.25, // pixels per frame at start
-  MAX_SCROLL_SPEED: 10, // cap
-  SPEED_RAMP_RATE: 0.001, // speed increase per frame (very gradual)
+  MAX_SCROLL_SPEED: 10, // cap for the ramped base component (bonuses stack on top)
+  SPEED_RAMP_RATE: 0.001, // base scroll never decreases; ramps toward MAX_SCROLL_SPEED
   PARALLAX_SPEEDS: [0.2, 0.5, 1.0] as readonly number[], // sky, midground, road
 
   // ── Slipstream ──
@@ -78,10 +78,18 @@ export const CONFIG = {
   DRAFT_FILL_RATE: 0.04,
   /** Added to persistent world speed each time the draft meter fills (not on zone enter). */
   DRAFT_SPEED_BONUS: 0.15,
-  /** Max total extra speed from completed drafts in one run (stacks until cap). */
-  DRAFT_SPEED_BONUS_MAX: 5,
-  SLINGSHOT_SPEED_BURST: 2.0, // added to scroll speed
-  SLINGSHOT_BURST_DURATION: 500, // ms
+  /**
+   * Caps persistent draft + slingshot stacking (each complete adds DRAFT_SPEED_BONUS + SLINGSHOT_SPEED_BURST).
+   */
+  DRAFT_SPEED_BONUS_MAX: 32,
+  /** Slingshot reward applied permanently on draft complete (no timed speed dip afterward). */
+  SLINGSHOT_SPEED_BURST: 2.0,
+  /** Reserved for ScrollManager / burst VFX timing (gameplay speed does not use a timed burst). */
+  SLINGSHOT_BURST_DURATION: 500,
+  /**
+   * While in a slipstream zone, extra speed × draft meter (0–1). Ramps up as you draft; no slowdown vs base.
+   */
+  DRAFT_ZONE_SPEED_MAX: 0.55,
 
   // ── Chain ──
   CHAIN_TIMEOUT: 3000, // ms without drafting → chain resets

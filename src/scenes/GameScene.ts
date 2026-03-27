@@ -61,8 +61,9 @@ export class GameScene extends Phaser.Scene {
   private roadWidth = 0;
   private readonly dashLength = 36;
   private readonly dashGap = 28;
-  private burstRemainingMs = 0;
-  /** Cumulative speed from completed draft meters; persists after leaving the zone. */
+  /** Ramped base scroll (never decreases); approaches CONFIG.MAX_SCROLL_SPEED. */
+  private rampedBaseScrollSpeed: number = CONFIG.BASE_SCROLL_SPEED;
+  /** Cumulative speed from completed drafts + slingshot (permanent; never drops). */
   private persistentDraftSpeedBonus = 0;
   private isRunOver = false;
   private isDraftFxActive = false;
@@ -171,7 +172,7 @@ export class GameScene extends Phaser.Scene {
     this.laneSystem.update();
     this.scrollRoad(delta);
     const speedScale = delta / (1000 / 60);
-    const baseScrollThisFrame = CONFIG.BASE_SCROLL_SPEED * speedScale;
+    const baseScrollThisFrame = this.rampedBaseScrollSpeed * speedScale;
     const draftWorldScrollRatio =
       baseScrollThisFrame > 0
         ? this.currentScrollStep / baseScrollThisFrame
@@ -339,13 +340,17 @@ export class GameScene extends Phaser.Scene {
 
   private scrollRoad(delta: number): void {
     const speedScale = delta / (1000 / 60);
-    this.burstRemainingMs = Math.max(0, this.burstRemainingMs - delta);
+    this.rampedBaseScrollSpeed = Math.min(
+      CONFIG.MAX_SCROLL_SPEED,
+      this.rampedBaseScrollSpeed + CONFIG.SPEED_RAMP_RATE * speedScale,
+    );
     const draftSpeed = this.persistentDraftSpeedBonus;
-    const burstSpeed =
-      this.burstRemainingMs > 0 ? CONFIG.SLINGSHOT_SPEED_BURST : 0;
-    this.currentWorldSpeedBonus = draftSpeed + burstSpeed;
+    const zoneDraftBonus = this.slipstreamZone.isCurrentlyDrafting()
+      ? this.slipstreamZone.getDraftMeter() * CONFIG.DRAFT_ZONE_SPEED_MAX
+      : 0;
+    this.currentWorldSpeedBonus = draftSpeed + zoneDraftBonus;
     const scrollStep =
-      (CONFIG.BASE_SCROLL_SPEED + draftSpeed + burstSpeed) * speedScale;
+      (this.rampedBaseScrollSpeed + draftSpeed + zoneDraftBonus) * speedScale;
     this.currentScrollStep = scrollStep;
     this.scoreManager.addDistance(scrollStep);
     const wrapY = this.scale.height + this.dashLength;
@@ -361,9 +366,10 @@ export class GameScene extends Phaser.Scene {
   private handleDraftComplete(): void {
     const chain = this.chainManager.completeDraft();
     this.scoreManager.addDraftCompleteBonus(chain);
-    this.burstRemainingMs = CONFIG.SLINGSHOT_BURST_DURATION;
     this.persistentDraftSpeedBonus = Math.min(
-      this.persistentDraftSpeedBonus + CONFIG.DRAFT_SPEED_BONUS,
+      this.persistentDraftSpeedBonus +
+        CONFIG.DRAFT_SPEED_BONUS +
+        CONFIG.SLINGSHOT_SPEED_BURST,
       CONFIG.DRAFT_SPEED_BONUS_MAX,
     );
     this.handleDraftEnd();
@@ -868,7 +874,7 @@ export class GameScene extends Phaser.Scene {
 
   private resetRunState(): void {
     this.isRunOver = false;
-    this.burstRemainingMs = 0;
+    this.rampedBaseScrollSpeed = CONFIG.BASE_SCROLL_SPEED;
     this.persistentDraftSpeedBonus = 0;
     this.isDraftFxActive = false;
     this.activeDraftVehicle = null;
