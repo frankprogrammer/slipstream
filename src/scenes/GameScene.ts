@@ -1,12 +1,12 @@
-import Phaser from 'phaser';
-import { CONFIG } from '../config';
-import { ChainManager } from '../engine/ChainManager';
-import { CollisionSystem } from '../engine/CollisionSystem';
-import { LaneSystem } from '../engine/LaneSystem';
-import { ScoreManager } from '../engine/ScoreManager';
-import { SlipstreamZone } from '../engine/SlipstreamZone';
-import { TrafficSpawner } from '../engine/TrafficSpawner';
-import { THEME } from '../skins/theme';
+import Phaser from "phaser";
+import { CONFIG } from "../config";
+import { ChainManager } from "../engine/ChainManager";
+import { CollisionSystem } from "../engine/CollisionSystem";
+import { LaneSystem } from "../engine/LaneSystem";
+import { ScoreManager } from "../engine/ScoreManager";
+import { SlipstreamZone } from "../engine/SlipstreamZone";
+import { TrafficSpawner } from "../engine/TrafficSpawner";
+import { THEME } from "../skins/theme";
 
 /**
  * GameScene — The single gameplay screen.
@@ -44,7 +44,12 @@ export class GameScene extends Phaser.Scene {
   private speedLines: Phaser.GameObjects.Rectangle[] = [];
   private trailCanvasTexture!: Phaser.Textures.CanvasTexture;
   private trailImage!: Phaser.GameObjects.Image;
-  private playerTrailPoints: Array<{ x: number; y: number; lifeMs: number; maxLifeMs: number }> = [];
+  private playerTrailPoints: Array<{
+    x: number;
+    y: number;
+    lifeMs: number;
+    maxLifeMs: number;
+  }> = [];
   private scoreText!: Phaser.GameObjects.Text;
   private draftMeterBg!: Phaser.GameObjects.Rectangle;
   private draftMeterFill!: Phaser.GameObjects.Rectangle;
@@ -67,12 +72,15 @@ export class GameScene extends Phaser.Scene {
   private trailSpawnAccumulatorMs = 0;
   /** 1 = full Laplacian bend smoothing; decays after lane switch so the ribbon eases straight instead of snapping. */
   private trailCurveBlend = 0;
+  private wasLaneSwitching = false;
+  /** Low-pass of draft pulse for trail fill (avoids harsh per-frame color flicker). */
+  private trailDraftColorPulseT = 0.5;
   private currentChain = 0;
   private currentScrollStep: number = CONFIG.BASE_SCROLL_SPEED;
   private currentWorldSpeedBonus = 0;
 
   constructor() {
-    super({ key: 'GameScene' });
+    super({ key: "GameScene" });
   }
 
   preload(): void {
@@ -94,9 +102,17 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Warm sunset shoulder color around the road.
-    this.skyBg = this.add.rectangle(width / 2, height / 2, width, height, THEME.TOKENS.skyFill).setDepth(-3);
+    this.skyBg = this.add
+      .rectangle(width / 2, height / 2, width, height, THEME.TOKENS.skyFill)
+      .setDepth(-3);
     this.roadBg = this.add
-      .rectangle(width / 2, height / 2, this.roadWidth, height, THEME.TOKENS.roadFill)
+      .rectangle(
+        width / 2,
+        height / 2,
+        this.roadWidth,
+        height,
+        THEME.TOKENS.roadFill,
+      )
       .setDepth(-2);
 
     this.createLaneDashes(height);
@@ -107,35 +123,39 @@ export class GameScene extends Phaser.Scene {
     this.createChainText();
     this.createPerfectText();
     this.laneSystem = new LaneSystem(this, this.player, this.laneCenters);
-    this.trafficSpawner = new TrafficSpawner(this, this.laneCenters, this.player.height);
+    this.trafficSpawner = new TrafficSpawner(
+      this,
+      this.laneCenters,
+      this.player.height,
+    );
     this.chainManager = new ChainManager(this);
     this.scoreManager = new ScoreManager(this);
     this.slipstreamZone = new SlipstreamZone(
       this,
       this.player,
       () => this.trafficSpawner.getVehicles(),
-      true
+      true,
     );
     this.collisionSystem = new CollisionSystem(
       this,
       this.player,
       () => this.trafficSpawner.getVehicles(),
-      () => this.handleCollision()
+      () => this.handleCollision(),
     );
-    this.events.on('draft-complete', this.handleDraftComplete, this);
-    this.events.on('draft-start', this.handleDraftStart, this);
-    this.events.on('draft-cancel', this.handleDraftEnd, this);
-    this.events.on('chain-changed', this.handleChainChanged, this);
-    this.events.on('chain-milestone', this.handleChainMilestone, this);
-    this.events.on('score-changed', this.handleScoreChanged, this);
+    this.events.on("draft-complete", this.handleDraftComplete, this);
+    this.events.on("draft-start", this.handleDraftStart, this);
+    this.events.on("draft-cancel", this.handleDraftEnd, this);
+    this.events.on("chain-changed", this.handleChainChanged, this);
+    this.events.on("chain-milestone", this.handleChainMilestone, this);
+    this.events.on("score-changed", this.handleScoreChanged, this);
     this.createFlashOverlay();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.events.off('draft-complete', this.handleDraftComplete, this);
-      this.events.off('draft-start', this.handleDraftStart, this);
-      this.events.off('draft-cancel', this.handleDraftEnd, this);
-      this.events.off('chain-changed', this.handleChainChanged, this);
-      this.events.off('chain-milestone', this.handleChainMilestone, this);
-      this.events.off('score-changed', this.handleScoreChanged, this);
+      this.events.off("draft-complete", this.handleDraftComplete, this);
+      this.events.off("draft-start", this.handleDraftStart, this);
+      this.events.off("draft-cancel", this.handleDraftEnd, this);
+      this.events.off("chain-changed", this.handleChainChanged, this);
+      this.events.off("chain-milestone", this.handleChainMilestone, this);
+      this.events.off("score-changed", this.handleScoreChanged, this);
       this.laneSystem.destroy();
       this.collisionSystem.destroy();
       this.slipstreamZone.destroy();
@@ -163,7 +183,11 @@ export class GameScene extends Phaser.Scene {
   private createLaneDashes(height: number): void {
     for (let separator = 1; separator < CONFIG.LANE_COUNT; separator += 1) {
       const x = this.roadLeft + separator * CONFIG.LANE_WIDTH;
-      for (let y = -this.dashLength; y <= height + this.dashLength; y += this.dashLength + this.dashGap) {
+      for (
+        let y = -this.dashLength;
+        y <= height + this.dashLength;
+        y += this.dashLength + this.dashGap
+      ) {
         const dash = this.add
           .rectangle(x, y, 6, this.dashLength, THEME.TOKENS.laneDivider)
           .setDepth(-1);
@@ -181,7 +205,7 @@ export class GameScene extends Phaser.Scene {
         playerY,
         CONFIG.LANE_WIDTH * 0.45,
         72,
-        THEME.TOKENS.playerBody
+        THEME.TOKENS.playerBody,
       )
       .setDepth(10)
       .setStrokeStyle(3, THEME.TOKENS.playerOutline);
@@ -190,15 +214,18 @@ export class GameScene extends Phaser.Scene {
   private createPlayerTrailCanvas(): void {
     const w = Math.ceil(this.scale.width);
     const h = Math.ceil(this.scale.height);
-    if (this.textures.exists('playerTrailCanvas')) {
-      this.textures.remove('playerTrailCanvas');
+    if (this.textures.exists("playerTrailCanvas")) {
+      this.textures.remove("playerTrailCanvas");
     }
-    const trailTex = this.textures.createCanvas('playerTrailCanvas', w, h);
+    const trailTex = this.textures.createCanvas("playerTrailCanvas", w, h);
     if (!trailTex) {
-      throw new Error('Failed to create playerTrailCanvas texture');
+      throw new Error("Failed to create playerTrailCanvas texture");
     }
     this.trailCanvasTexture = trailTex;
-    this.trailImage = this.add.image(0, 0, 'playerTrailCanvas').setOrigin(0, 0).setDepth(9);
+    this.trailImage = this.add
+      .image(0, 0, "playerTrailCanvas")
+      .setOrigin(0, 0)
+      .setDepth(9);
   }
 
   private createDraftMeter(): void {
@@ -206,7 +233,13 @@ export class GameScene extends Phaser.Scene {
     const meterHeight = 8;
 
     this.draftMeterBg = this.add
-      .rectangle(this.player.x, this.player.y - 62, meterWidth, meterHeight, THEME.TOKENS.draftMeterBg)
+      .rectangle(
+        this.player.x,
+        this.player.y - 62,
+        meterWidth,
+        meterHeight,
+        THEME.TOKENS.draftMeterBg,
+      )
       .setDepth(11)
       .setVisible(false);
 
@@ -216,7 +249,7 @@ export class GameScene extends Phaser.Scene {
         this.player.y - 62,
         0,
         meterHeight - 2,
-        THEME.TOKENS.draftMeterFill
+        THEME.TOKENS.draftMeterFill,
       )
       .setOrigin(0, 0.5)
       .setDepth(12)
@@ -225,9 +258,9 @@ export class GameScene extends Phaser.Scene {
 
   private createScoreText(): void {
     this.scoreText = this.add
-      .text(this.scale.width / 2, 16, '0', {
-        fontFamily: 'Arial',
-        fontSize: '40px',
+      .text(this.scale.width / 2, 16, "0", {
+        fontFamily: "Arial",
+        fontSize: "40px",
         color: THEME.TOKENS.hudTextHex,
       })
       .setOrigin(0.5, 0)
@@ -237,9 +270,9 @@ export class GameScene extends Phaser.Scene {
 
   private createChainText(): void {
     this.chainText = this.add
-      .text(this.scale.width / 2, 86, 'x0', {
-        fontFamily: 'Arial',
-        fontSize: '30px',
+      .text(this.scale.width / 2, 86, "x0", {
+        fontFamily: "Arial",
+        fontSize: "30px",
         color: THEME.TOKENS.hudTextHex,
       })
       .setOrigin(0.5, 0)
@@ -254,7 +287,7 @@ export class GameScene extends Phaser.Scene {
         this.scale.height / 2,
         this.scale.width,
         this.scale.height,
-        THEME.TOKENS.milestoneFlash
+        THEME.TOKENS.milestoneFlash,
       )
       .setDepth(40)
       .setAlpha(0)
@@ -263,9 +296,9 @@ export class GameScene extends Phaser.Scene {
 
   private createPerfectText(): void {
     this.perfectText = this.add
-      .text(this.scale.width / 2, this.scale.height * 0.36, 'PERFECT!', {
-        fontFamily: 'Arial',
-        fontSize: '58px',
+      .text(this.scale.width / 2, this.scale.height * 0.36, "PERFECT!", {
+        fontFamily: "Arial",
+        fontSize: "58px",
         color: THEME.TOKENS.hudTextHex,
       })
       .setOrigin(0.5)
@@ -296,9 +329,11 @@ export class GameScene extends Phaser.Scene {
     const speedScale = delta / (1000 / 60);
     this.burstRemainingMs = Math.max(0, this.burstRemainingMs - delta);
     const draftSpeed = this.persistentDraftSpeedBonus;
-    const burstSpeed = this.burstRemainingMs > 0 ? CONFIG.SLINGSHOT_SPEED_BURST : 0;
+    const burstSpeed =
+      this.burstRemainingMs > 0 ? CONFIG.SLINGSHOT_SPEED_BURST : 0;
     this.currentWorldSpeedBonus = draftSpeed + burstSpeed;
-    const scrollStep = (CONFIG.BASE_SCROLL_SPEED + draftSpeed + burstSpeed) * speedScale;
+    const scrollStep =
+      (CONFIG.BASE_SCROLL_SPEED + draftSpeed + burstSpeed) * speedScale;
     this.currentScrollStep = scrollStep;
     this.scoreManager.addDistance(scrollStep);
     const wrapY = this.scale.height + this.dashLength;
@@ -317,7 +352,7 @@ export class GameScene extends Phaser.Scene {
     this.burstRemainingMs = CONFIG.SLINGSHOT_BURST_DURATION;
     this.persistentDraftSpeedBonus = Math.min(
       this.persistentDraftSpeedBonus + CONFIG.DRAFT_SPEED_BONUS,
-      CONFIG.DRAFT_SPEED_BONUS_MAX
+      CONFIG.DRAFT_SPEED_BONUS_MAX,
     );
     this.handleDraftEnd();
 
@@ -327,7 +362,7 @@ export class GameScene extends Phaser.Scene {
       scaleY: 0.9,
       duration: 70,
       yoyo: true,
-      ease: 'Sine.Out',
+      ease: "Sine.Out",
     });
   }
 
@@ -339,7 +374,7 @@ export class GameScene extends Phaser.Scene {
       targets: this.chainText,
       scale: 1,
       duration: CONFIG.CHAIN_POP_DURATION,
-      ease: 'Back.easeOut',
+      ease: "Back.easeOut",
     });
   }
 
@@ -353,9 +388,10 @@ export class GameScene extends Phaser.Scene {
     this.activeDraftVehicle = vehicle;
     vehicle.setStrokeStyle(4, THEME.TOKENS.draftGlow);
     const glowPulseMs = Phaser.Math.Clamp(
-      CONFIG.DRAFT_GLOW_PULSE_SPEED - chainIntensityFor(this.currentChain) * 350,
+      CONFIG.DRAFT_GLOW_PULSE_SPEED -
+        chainIntensityFor(this.currentChain) * 350,
       260,
-      CONFIG.DRAFT_GLOW_PULSE_SPEED
+      CONFIG.DRAFT_GLOW_PULSE_SPEED,
     );
     this.draftGlowTween = this.tweens.add({
       targets: vehicle,
@@ -363,7 +399,7 @@ export class GameScene extends Phaser.Scene {
       duration: glowPulseMs / 2,
       yoyo: true,
       repeat: -1,
-      ease: 'Sine.InOut',
+      ease: "Sine.InOut",
     });
   }
 
@@ -399,7 +435,10 @@ export class GameScene extends Phaser.Scene {
       line.setFillStyle(this.getSpeedLineFillColor());
       line.y += speedLineVelocity;
       line.alpha = Math.max(0, line.alpha - 0.025 * speedScale);
-      if (line.y - line.height / 2 > this.scale.height + 24 || line.alpha <= 0) {
+      if (
+        line.y - line.height / 2 > this.scale.height + 24 ||
+        line.alpha <= 0
+      ) {
         line.destroy();
         this.speedLines.splice(i, 1);
       }
@@ -413,7 +452,7 @@ export class GameScene extends Phaser.Scene {
     const targetFrequency = Phaser.Math.Clamp(
       CONFIG.SPEED_LINES_FREQUENCY - intensity * 28,
       20,
-      CONFIG.SPEED_LINES_FREQUENCY
+      CONFIG.SPEED_LINES_FREQUENCY,
     );
     while (this.speedLineSpawnAccumulatorMs >= targetFrequency) {
       this.speedLineSpawnAccumulatorMs -= targetFrequency;
@@ -428,30 +467,40 @@ export class GameScene extends Phaser.Scene {
       ? Phaser.Math.Between(6, Math.max(8, this.roadLeft - 4))
       : Phaser.Math.Between(
           Math.min(this.scale.width - 8, this.roadLeft + this.roadWidth + 4),
-          this.scale.width - 6
+          this.scale.width - 6,
         );
     const y = Phaser.Math.Between(0, this.scale.height - 120);
     const line = this.add
       .rectangle(
         x,
         y,
-        Phaser.Math.Between(CONFIG.SPEED_LINES_WIDTH_MIN, CONFIG.SPEED_LINES_WIDTH_MAX),
-        Phaser.Math.Between(CONFIG.SPEED_LINES_HEIGHT_MIN, CONFIG.SPEED_LINES_HEIGHT_MAX),
-        this.getSpeedLineFillColor()
+        Phaser.Math.Between(
+          CONFIG.SPEED_LINES_WIDTH_MIN,
+          CONFIG.SPEED_LINES_WIDTH_MAX,
+        ),
+        Phaser.Math.Between(
+          CONFIG.SPEED_LINES_HEIGHT_MIN,
+          CONFIG.SPEED_LINES_HEIGHT_MAX,
+        ),
+        this.getSpeedLineFillColor(),
       )
       .setDepth(14)
       .setAlpha(
         Phaser.Math.Clamp(
           CONFIG.SPEED_LINES_BASE_ALPHA + intensity * 0.35,
           CONFIG.SPEED_LINES_BASE_ALPHA,
-          CONFIG.SPEED_LINES_MAX_ALPHA
-        )
+          CONFIG.SPEED_LINES_MAX_ALPHA,
+        ),
       );
     this.speedLines.push(line);
   }
 
   private updatePlayerTrail(delta: number): void {
-    const speedFactor = Phaser.Math.Clamp(this.currentScrollStep / CONFIG.BASE_SCROLL_SPEED, 1, 2.6);
+    const speedFactor = Phaser.Math.Clamp(
+      this.currentScrollStep / CONFIG.BASE_SCROLL_SPEED,
+      1,
+      2.6,
+    );
     const moveScale = delta / (1000 / 60);
 
     for (let i = this.playerTrailPoints.length - 1; i >= 0; i -= 1) {
@@ -467,13 +516,17 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.trailSpawnAccumulatorMs += delta;
-    const spawnIntervalMs = Phaser.Math.Clamp(48 / speedFactor, 14, 48);
+    const spawnIntervalMs = Phaser.Math.Clamp(
+      48 / speedFactor,
+      CONFIG.TRAIL_SPAWN_INTERVAL_MIN_MS,
+      48,
+    );
     while (this.trailSpawnAccumulatorMs >= spawnIntervalMs) {
       this.trailSpawnAccumulatorMs -= spawnIntervalMs;
       this.spawnPlayerTrailPoint(speedFactor);
     }
 
-    this.renderPlayerTrail(speedFactor);
+    this.renderPlayerTrail(delta, speedFactor);
   }
 
   private spawnPlayerTrailPoint(speedFactor: number): void {
@@ -489,7 +542,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private renderPlayerTrail(speedFactor: number): void {
+  private renderPlayerTrail(delta: number, speedFactor: number): void {
     const ctx = this.trailCanvasTexture.context;
     const canvas = this.trailCanvasTexture.canvas;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -505,20 +558,30 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const dense = this.densifyPolyline(smoothed, CONFIG.TRAIL_DENSIFY_MAX_SEGMENT_PX);
-    const ribbon = this.blendDenseWithLaplacianSmooth(dense, this.trailCurveBlend);
+    const dense = this.densifyPolyline(
+      smoothed,
+      CONFIG.TRAIL_DENSIFY_MAX_SEGMENT_PX,
+    );
+    const ribbon = this.blendDenseWithLaplacianSmooth(
+      dense,
+      this.trailCurveBlend,
+    );
     const n = ribbon.length;
     const headWidth = this.player.width * 0.75;
     const tailWidth = this.player.width * 0.25;
-    const overallAlpha = Phaser.Math.Clamp(0.7 + (speedFactor - 1) * 0.2, 0.7, 1);
-    const colorInt = this.getPlayerTrailFillColor();
+    const overallAlpha = Phaser.Math.Clamp(
+      0.7 + (speedFactor - 1) * 0.2,
+      0.7,
+      1,
+    );
+    const colorInt = this.getPlayerTrailFillColor(delta);
     const rgb = Phaser.Display.Color.IntegerToColor(colorInt);
 
     ctx.save();
     // One continuous stroke so round joins close corners (segment+butt strokes leave wedge gaps — “open book”).
     // Canvas 2D can’t vary line width along one path; approximate taper with alpha gradient + width between head/tail.
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.lineWidth = Math.max(2, Phaser.Math.Linear(headWidth, tailWidth, 0.42));
 
     const hx = ribbon[0].x;
@@ -526,8 +589,14 @@ export class GameScene extends Phaser.Scene {
     const tx = ribbon[n - 1].x;
     const ty = ribbon[n - 1].y;
     const grad = ctx.createLinearGradient(hx, hy, tx, ty);
-    grad.addColorStop(0, `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha})`);
-    grad.addColorStop(1, `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha * 0.04})`);
+    grad.addColorStop(
+      0,
+      `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha})`,
+    );
+    grad.addColorStop(
+      1,
+      `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha * 0.04})`,
+    );
     ctx.strokeStyle = grad;
 
     ctx.beginPath();
@@ -541,29 +610,44 @@ export class GameScene extends Phaser.Scene {
     this.trailCanvasTexture.refresh();
   }
 
-  /** While actively drafting, pulse trail color between base blue and teal (same timing as draft vehicle glow). */
-  private getPlayerTrailFillColor(): number {
+  /** While actively drafting, pulse trail color between base blue and teal (smoothed vs vehicle glow to limit ribbon flicker). */
+  private getPlayerTrailFillColor(delta: number): number {
     if (!this.slipstreamZone.isCurrentlyDrafting()) {
+      this.trailDraftColorPulseT = 0.5;
       return THEME.TOKENS.playerTrail;
     }
 
     const glowPulseMs = Phaser.Math.Clamp(
-      CONFIG.DRAFT_GLOW_PULSE_SPEED - chainIntensityFor(this.currentChain) * 350,
+      CONFIG.DRAFT_GLOW_PULSE_SPEED -
+        chainIntensityFor(this.currentChain) * 350,
       260,
-      CONFIG.DRAFT_GLOW_PULSE_SPEED
+      CONFIG.DRAFT_GLOW_PULSE_SPEED,
     );
-    const t = Math.sin((this.time.now / glowPulseMs) * Math.PI * 2) * 0.5 + 0.5;
+    const targetT =
+      Math.sin((this.time.now / glowPulseMs) * Math.PI * 2) * 0.5 + 0.5;
+    const smooth = 1 - Math.exp(-delta * 0.005);
+    this.trailDraftColorPulseT = Phaser.Math.Linear(
+      this.trailDraftColorPulseT,
+      targetT,
+      smooth,
+    );
+    const t = this.trailDraftColorPulseT;
     const c0 = Phaser.Display.Color.IntegerToColor(THEME.TOKENS.playerTrail);
-    const c1 = Phaser.Display.Color.IntegerToColor(THEME.TOKENS.playerTrailDraftPulseTeal);
+    const c1 = Phaser.Display.Color.IntegerToColor(
+      THEME.TOKENS.playerTrailDraftPulseTeal,
+    );
     return Phaser.Display.Color.GetColor(
       Phaser.Math.Linear(c0.red, c1.red, t),
       Phaser.Math.Linear(c0.green, c1.green, t),
-      Phaser.Math.Linear(c0.blue, c1.blue, t)
+      Phaser.Math.Linear(c0.blue, c1.blue, t),
     );
   }
 
   /** Insert points along long edges so ribbon tangents don’t jump (lane-change diagonals). */
-  private densifyPolyline(points: Phaser.Math.Vector2[], maxSegLen: number): Phaser.Math.Vector2[] {
+  private densifyPolyline(
+    points: Phaser.Math.Vector2[],
+    maxSegLen: number,
+  ): Phaser.Math.Vector2[] {
     if (points.length < 2) {
       return points;
     }
@@ -578,7 +662,12 @@ export class GameScene extends Phaser.Scene {
       const steps = Math.max(1, Math.ceil(dist / maxSegLen));
       for (let s = 1; s <= steps; s += 1) {
         const t = s / steps;
-        out.push(new Phaser.Math.Vector2(Phaser.Math.Linear(a.x, b.x, t), Phaser.Math.Linear(a.y, b.y, t)));
+        out.push(
+          new Phaser.Math.Vector2(
+            Phaser.Math.Linear(a.x, b.x, t),
+            Phaser.Math.Linear(a.y, b.y, t),
+          ),
+        );
       }
     }
     return out;
@@ -587,14 +676,14 @@ export class GameScene extends Phaser.Scene {
   /** Blend densified polyline (straighter in-lane) with Laplacian-smoothed (full bend). */
   private blendDenseWithLaplacianSmooth(
     dense: Phaser.Math.Vector2[],
-    blend: number
+    blend: number,
   ): Phaser.Math.Vector2[] {
     if (blend <= 0) {
       return dense;
     }
     const smooth = this.smoothRibbonLaplacian(
       dense.map((p) => p.clone()),
-      CONFIG.TRAIL_LAPLACIAN_SMOOTH_PASSES
+      CONFIG.TRAIL_LAPLACIAN_SMOOTH_PASSES,
     );
     if (blend >= 1) {
       return smooth;
@@ -603,13 +692,16 @@ export class GameScene extends Phaser.Scene {
       const s = smooth[i];
       return new Phaser.Math.Vector2(
         Phaser.Math.Linear(p.x, s.x, blend),
-        Phaser.Math.Linear(p.y, s.y, blend)
+        Phaser.Math.Linear(p.y, s.y, blend),
       );
     });
   }
 
   /** Light smoothing of the centerline to soften lane-change corners (no sharp kinks). */
-  private smoothRibbonLaplacian(points: Phaser.Math.Vector2[], passes: number): Phaser.Math.Vector2[] {
+  private smoothRibbonLaplacian(
+    points: Phaser.Math.Vector2[],
+    passes: number,
+  ): Phaser.Math.Vector2[] {
     if (passes < 1 || points.length < 3) {
       return points;
     }
@@ -626,7 +718,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildSmoothedTrailPoints(
-    points: Array<{ x: number; y: number; lifeMs: number; maxLifeMs: number }>
+    points: Array<{ x: number; y: number; lifeMs: number; maxLifeMs: number }>,
   ): Phaser.Math.Vector2[] {
     let smoothed = points.map((p) => new Phaser.Math.Vector2(p.x, p.y));
     if (smoothed.length < 3) {
@@ -640,8 +732,14 @@ export class GameScene extends Phaser.Scene {
       for (let i = 0; i < smoothed.length - 1; i += 1) {
         const p0 = smoothed[i];
         const p1 = smoothed[i + 1];
-        const q = new Phaser.Math.Vector2(0.75 * p0.x + 0.25 * p1.x, 0.75 * p0.y + 0.25 * p1.y);
-        const r = new Phaser.Math.Vector2(0.25 * p0.x + 0.75 * p1.x, 0.25 * p0.y + 0.75 * p1.y);
+        const q = new Phaser.Math.Vector2(
+          0.75 * p0.x + 0.25 * p1.x,
+          0.75 * p0.y + 0.25 * p1.y,
+        );
+        const r = new Phaser.Math.Vector2(
+          0.25 * p0.x + 0.75 * p1.x,
+          0.25 * p0.y + 0.75 * p1.y,
+        );
         next.push(q, r);
       }
       next.push(smoothed[smoothed.length - 1].clone());
@@ -662,21 +760,25 @@ export class GameScene extends Phaser.Scene {
       targets: this.flashOverlay,
       alpha: 0,
       duration: CONFIG.SCREEN_FLASH_DURATION,
-      ease: 'Quad.Out',
+      ease: "Quad.Out",
       onComplete: () => {
         this.flashOverlay.setVisible(false);
       },
     });
 
     this.tweens.killTweensOf(this.perfectText);
-    this.perfectText.setVisible(true).setAlpha(1).setScale(0.84).setY(this.scale.height * 0.38);
+    this.perfectText
+      .setVisible(true)
+      .setAlpha(1)
+      .setScale(0.84)
+      .setY(this.scale.height * 0.38);
     this.tweens.add({
       targets: this.perfectText,
       y: this.scale.height * 0.33,
       scale: 1,
       alpha: 0,
       duration: 1000,
-      ease: 'Cubic.Out',
+      ease: "Cubic.Out",
       onComplete: () => {
         this.perfectText.setVisible(false);
       },
@@ -699,9 +801,18 @@ export class GameScene extends Phaser.Scene {
     const toIndex = (fromIndex + 1) % colorCount;
     const t = wrappedPhase - fromIndex;
 
-    const from = Phaser.Display.Color.HexStringToColor(THEME.SKY_GRADIENT[fromIndex]);
-    const to = Phaser.Display.Color.HexStringToColor(THEME.SKY_GRADIENT[toIndex]);
-    const lerped = Phaser.Display.Color.Interpolate.ColorWithColor(from, to, 1, t);
+    const from = Phaser.Display.Color.HexStringToColor(
+      THEME.SKY_GRADIENT[fromIndex],
+    );
+    const to = Phaser.Display.Color.HexStringToColor(
+      THEME.SKY_GRADIENT[toIndex],
+    );
+    const lerped = Phaser.Display.Color.Interpolate.ColorWithColor(
+      from,
+      to,
+      1,
+      t,
+    );
     return Phaser.Display.Color.GetColor(lerped.r, lerped.g, lerped.b);
   }
 
@@ -709,7 +820,11 @@ export class GameScene extends Phaser.Scene {
   private getSpeedLineFillColor(): number {
     const sky = this.getSkyGradientFillColor();
     const c = Phaser.Display.Color.IntegerToColor(sky);
-    return Phaser.Display.Color.GetColor(255 - c.red, 255 - c.green, 255 - c.blue);
+    return Phaser.Display.Color.GetColor(
+      255 - c.red,
+      255 - c.green,
+      255 - c.blue,
+    );
   }
 
   private updateSkyGradient(): void {
@@ -722,8 +837,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.isRunOver = true;
-    this.chainManager.resetChain('collision');
-    this.scene.start('GameOverScene', {
+    this.chainManager.resetChain("collision");
+    this.scene.start("GameOverScene", {
       score: Math.floor(this.scoreManager.getScore()),
       bestChain: this.chainManager.getBestChain(),
       distance: Math.floor(this.scoreManager.getDistancePx()),
@@ -739,6 +854,8 @@ export class GameScene extends Phaser.Scene {
     this.speedLineSpawnAccumulatorMs = 0;
     this.trailSpawnAccumulatorMs = 0;
     this.trailCurveBlend = 0;
+    this.wasLaneSwitching = false;
+    this.trailDraftColorPulseT = 0.5;
     this.currentChain = 0;
     this.currentScrollStep = CONFIG.BASE_SCROLL_SPEED;
     this.currentWorldSpeedBonus = 0;
