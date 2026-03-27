@@ -345,8 +345,10 @@ export class GameScene extends Phaser.Scene {
       this.rampedBaseScrollSpeed + CONFIG.SPEED_RAMP_RATE * speedScale,
     );
     const draftSpeed = this.persistentDraftSpeedBonus;
+    const m = this.slipstreamZone.getDraftMeter();
     const zoneDraftBonus = this.slipstreamZone.isCurrentlyDrafting()
-      ? this.slipstreamZone.getDraftMeter() * CONFIG.DRAFT_ZONE_SPEED_MAX
+      ? CONFIG.DRAFT_ZONE_SPEED_MAX *
+        Math.pow(m, CONFIG.DRAFT_ZONE_SPEED_CURVE_POWER)
       : 0;
     this.currentWorldSpeedBonus = draftSpeed + zoneDraftBonus;
     const scrollStep =
@@ -366,10 +368,10 @@ export class GameScene extends Phaser.Scene {
   private handleDraftComplete(): void {
     const chain = this.chainManager.completeDraft();
     this.scoreManager.addDraftCompleteBonus(chain);
+    const slipstreamSpeedIncrement =
+      CONFIG.DRAFT_SPEED_BONUS_MAX / CONFIG.SLIPSTREAM_COMPLETES_TO_MAX_BONUS;
     this.persistentDraftSpeedBonus = Math.min(
-      this.persistentDraftSpeedBonus +
-        CONFIG.DRAFT_SPEED_BONUS +
-        CONFIG.SLINGSHOT_SPEED_BURST,
+      this.persistentDraftSpeedBonus + slipstreamSpeedIncrement,
       CONFIG.DRAFT_SPEED_BONUS_MAX,
     );
     this.handleDraftEnd();

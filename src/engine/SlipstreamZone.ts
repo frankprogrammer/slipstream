@@ -11,7 +11,7 @@ import { THEME } from "../skins/theme";
  *
  * When the player overlaps this zone:
  * 1. Emit 'draft-start' event (first frame of overlap)
- * 2. Fill draft meter at CONFIG.DRAFT_FILL_RATE × (world scroll speed / base scroll speed) per frame
+ * 2. Fill draft meter at CONFIG.DRAFT_FILL_RATE × (scroll ratio clamped to DRAFT_FILL_SPEED_RATIO_MAX) per frame
  * 3. When meter fills → emit 'draft-complete'
  *
  * When player exits without filling meter → emit 'draft-cancel'
@@ -89,7 +89,11 @@ export class SlipstreamZone {
     const fill =
       CONFIG.DRAFT_FILL_RATE *
       speedScale *
-      Phaser.Math.Clamp(worldScrollSpeedRatio, 0.15, 5);
+      Phaser.Math.Clamp(
+        worldScrollSpeedRatio,
+        0.15,
+        CONFIG.DRAFT_FILL_SPEED_RATIO_MAX,
+      );
     this.draftMeter = Math.min(1, this.draftMeter + fill);
     this.scene.events.emit("draft-progress", this.draftMeter);
 
@@ -173,7 +177,9 @@ export class SlipstreamZone {
         ? THEME.TOKENS.debugZoneActive
         : THEME.TOKENS.debugZoneIdle;
       // Per-streak alpha (many streaks stack visually; same active/idle contrast as before).
-      const streakAlpha = isActive ? 0.22 : 0.12;
+      const streakAlpha = isActive
+        ? CONFIG.SLIPSTREAM_DEBUG_STREAK_ALPHA_ACTIVE
+        : CONFIG.SLIPSTREAM_DEBUG_STREAK_ALPHA_IDLE;
       this.drawSpeedLineStyleStripesInZone(this.zoneRect, fillColor, streakAlpha);
     }
   }

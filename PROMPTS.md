@@ -340,6 +340,26 @@ So that when you enter a slipstream, the camera zooms in a little bit. And then 
 
 Can you update my prompts.md file? And also, is it still possible to update it automatically every time I make a new prompt?
 
+### 81
+
+Can we make The slipstream, about 75% opacity of what it currently is. Also, the speed of the slipstream seems to be ramping up way too quickly now. It wasn't what it was before.
+
+### 82
+
+This is definitely a lot better but let's make the speed boost gained about half of what it currently is. Also it doesn't seem like the fill bar of being in the slipstream is scaling proportionally with the speed. of the game. So I can never actually activate a slipstream now at faster speeds.
+
+### 83
+
+The speed boost from being in the slipstream still seems to grow really quickly. It almost seems like it's exponential until how fast it's growing.
+
+### 84
+
+Right now, the game seems to scale up to the max speed bonus from slipstreams within about eight successful slipstreams. I need to make it based off of... 25 successful slipstreams.
+
+### 85
+
+Update my prompts.md
+
 ---
 
 ## Lane input — current behavior (`src/engine/LaneSystem.ts`)
