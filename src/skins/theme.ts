@@ -1,5 +1,5 @@
-import Phaser from 'phaser';
-import { SKIN_MANIFEST } from './default/manifest';
+import Phaser from "phaser";
+import { SKIN_MANIFEST } from "./default/manifest";
 
 function toColorNumber(hex: string): number {
   return Phaser.Display.Color.HexStringToColor(hex).color;
@@ -62,7 +62,7 @@ export const THEME = {
     laneDivider: COLORS.VERY_SOFT_BLUE,
     playerBody: COLORS.LAVENDER_VIOLET,
     playerOutline: COLORS.VERY_SOFT_BLUE,
-    playerTrail: COLORS.LAVENDER_VIOLET,
+    playerTrail: COLORS.CORNFLOWER_BLUE,
 
     draftMeterBg: COLORS.CHARCOAL_BLUE,
     draftMeterFill: COLORS.ELECTRIC_CYAN,
@@ -84,4 +84,3 @@ export const THEME = {
     shareAccentHex: HEX.PASTEL_GREEN,
   },
 } as const;
-

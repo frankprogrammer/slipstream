@@ -65,9 +65,10 @@ export class TrafficSpawner {
     }
 
     const speedScale = delta / (1000 / 60);
+    const effectiveSpeeds = this.vehicleSpeeds.map((_, index) => this.getSafeSpeedForIndex(index));
     for (let i = this.vehicles.length - 1; i >= 0; i -= 1) {
       const vehicle = this.vehicles[i];
-      vehicle.y += this.vehicleSpeeds[i] * speedScale;
+      vehicle.y += effectiveSpeeds[i] * speedScale;
 
       if (vehicle.y - vehicle.height / 2 > this.scene.scale.height + 24) {
         vehicle.destroy();
@@ -75,6 +76,8 @@ export class TrafficSpawner {
         this.vehicleSpeeds.splice(i, 1);
       }
     }
+
+    this.enforceMinAdjacentLaneGap();
   }
 
   destroy(): void {
@@ -206,10 +209,83 @@ export class TrafficSpawner {
   private createSpawnSpec(phase: TrafficPhase): { width: number; height: number; speed: number } {
     const width = CONFIG.LANE_WIDTH * Phaser.Math.FloatBetween(0.5, 0.68);
     const height = Phaser.Math.Between(70, 95);
-    // Important: keep vehicle speeds consistent so adjacency spacing stays valid over time.
-    // If vehicles have different speeds, they can drift into "no lane change" alignments later.
-    const speed = CONFIG.VEHICLE_BASE_SPEED;
+    const variance = Phaser.Math.FloatBetween(-phase.speedVariance, phase.speedVariance);
+    const speed = CONFIG.VEHICLE_BASE_SPEED * (1 + variance);
     return { width, height, speed };
+  }
+
+  private getSafeSpeedForIndex(index: number): number {
+    const vehicle = this.vehicles[index];
+    const lane = this.getLaneIndexForX(vehicle.x);
+    if (lane === -1) {
+      return this.vehicleSpeeds[index];
+    }
+
+    const y = vehicle.y;
+    const minGap = this.getMinAdjacentGap();
+    let speed = this.vehicleSpeeds[index];
+
+    for (let j = 0; j < this.vehicles.length; j += 1) {
+      if (j === index) {
+        continue;
+      }
+      const other = this.vehicles[j];
+      const otherLane = this.getLaneIndexForX(other.x);
+      if (otherLane === -1 || Math.abs(otherLane - lane) > 1) {
+        continue;
+      }
+
+      // Consider only vehicles ahead (greater y).
+      if (other.y <= y) {
+        continue;
+      }
+
+      const gap = other.y - y;
+      if (gap < minGap * 1.5) {
+        speed = Math.min(speed, this.vehicleSpeeds[j]);
+      }
+    }
+
+    return speed;
+  }
+
+  private enforceMinAdjacentLaneGap(): void {
+    const minGap = this.getMinAdjacentGap();
+
+    for (let i = 0; i < this.vehicles.length; i += 1) {
+      const laneI = this.getLaneIndexForX(this.vehicles[i].x);
+      if (laneI === -1) {
+        continue;
+      }
+
+      for (let j = i + 1; j < this.vehicles.length; j += 1) {
+        const laneJ = this.getLaneIndexForX(this.vehicles[j].x);
+        if (laneJ === -1 || Math.abs(laneI - laneJ) !== 1) {
+          continue;
+        }
+
+        const a = this.vehicles[i];
+        const b = this.vehicles[j];
+        const distance = Math.abs(a.y - b.y);
+        if (distance >= minGap) {
+          continue;
+        }
+
+        // Move the trailing vehicle backward to preserve a valid lane-change window.
+        if (a.y < b.y) {
+          a.y = b.y - minGap;
+        } else {
+          b.y = a.y - minGap;
+        }
+      }
+    }
+  }
+
+  private getMinAdjacentGap(): number {
+    // Include both body-clearance and slipstream interaction depth
+    // so adjacent-lane windows remain navigable with draft zones present.
+    const playerClearance = this.playerHeight * CONFIG.TRAFFIC_ADJACENT_LANE_MIN_GAP_MULTIPLIER;
+    return playerClearance + CONFIG.SLIPSTREAM_ZONE_DEPTH;
   }
 
   private getLaneIndexForX(x: number): number {

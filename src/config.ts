@@ -35,6 +35,7 @@ export const CONFIG = {
   SLIPSTREAM_ZONE_WIDTH: 80, // pixels wide (centered behind vehicle)
   SLIPSTREAM_ZONE_DEPTH: 120, // pixels below vehicle
   DRAFT_FILL_RATE: 0.02, // per frame (~1.5s at 60fps to fill)
+  DRAFT_SPEED_BONUS: 1.0, // added to scroll speed while actively drafting
   SLINGSHOT_SPEED_BURST: 2.0, // added to scroll speed
   SLINGSHOT_BURST_DURATION: 500, // ms
 

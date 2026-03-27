@@ -56,6 +56,7 @@ export class GameScene extends Phaser.Scene {
   private readonly dashLength = 36;
   private readonly dashGap = 28;
   private burstRemainingMs = 0;
+  private draftSpeedBonusActive = false;
   private isRunOver = false;
   private isDraftFxActive = false;
   private activeDraftVehicle: Phaser.GameObjects.Rectangle | null = null;
@@ -64,7 +65,6 @@ export class GameScene extends Phaser.Scene {
   private trailSpawnAccumulatorMs = 0;
   private currentChain = 0;
   private currentScrollStep: number = CONFIG.BASE_SCROLL_SPEED;
-  private previousPlayerX = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -96,7 +96,6 @@ export class GameScene extends Phaser.Scene {
 
     this.createLaneDashes(height);
     this.createPlayer(height);
-    this.previousPlayerX = this.player.x;
     this.createPlayerTrailGraphics();
     this.createScoreText();
     this.createDraftMeter();
@@ -281,8 +280,9 @@ export class GameScene extends Phaser.Scene {
   private scrollRoad(delta: number): void {
     const speedScale = delta / (1000 / 60);
     this.burstRemainingMs = Math.max(0, this.burstRemainingMs - delta);
+    const draftSpeed = this.draftSpeedBonusActive ? CONFIG.DRAFT_SPEED_BONUS : 0;
     const burstSpeed = this.burstRemainingMs > 0 ? CONFIG.SLINGSHOT_SPEED_BURST : 0;
-    const scrollStep = (CONFIG.BASE_SCROLL_SPEED + burstSpeed) * speedScale;
+    const scrollStep = (CONFIG.BASE_SCROLL_SPEED + draftSpeed + burstSpeed) * speedScale;
     this.currentScrollStep = scrollStep;
     this.scoreManager.addDistance(scrollStep);
     const wrapY = this.scale.height + this.dashLength;
@@ -329,6 +329,7 @@ export class GameScene extends Phaser.Scene {
 
   private handleDraftStart(vehicle: Phaser.GameObjects.Rectangle): void {
     this.clearDraftEffects();
+    this.draftSpeedBonusActive = true;
     this.isDraftFxActive = true;
     this.activeDraftVehicle = vehicle;
     vehicle.setStrokeStyle(4, THEME.TOKENS.draftGlow);
@@ -348,6 +349,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleDraftEnd(): void {
+    this.draftSpeedBonusActive = false;
     this.clearDraftEffects();
   }
 
@@ -426,9 +428,6 @@ export class GameScene extends Phaser.Scene {
   private updatePlayerTrail(delta: number): void {
     const speedFactor = Phaser.Math.Clamp(this.currentScrollStep / CONFIG.BASE_SCROLL_SPEED, 1, 2.6);
     const moveScale = delta / (1000 / 60);
-    const isSwipingBetweenLanes = Math.abs(this.player.x - this.previousPlayerX) > 0.1;
-    const baseCatchupRate = 0.12 * moveScale;
-    const catchupRate = isSwipingBetweenLanes ? baseCatchupRate : baseCatchupRate;
 
     for (let i = this.playerTrailPoints.length - 1; i >= 0; i -= 1) {
       const point = this.playerTrailPoints[i];
@@ -440,7 +439,6 @@ export class GameScene extends Phaser.Scene {
       }
 
       point.y += this.currentScrollStep * 1.1 * moveScale;
-      point.x += (this.player.x - point.x) * catchupRate;
     }
 
     this.trailSpawnAccumulatorMs += delta;
@@ -451,7 +449,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.renderPlayerTrail(speedFactor);
-    this.previousPlayerX = this.player.x;
   }
 
   private spawnPlayerTrailPoint(speedFactor: number): void {
@@ -615,13 +612,13 @@ export class GameScene extends Phaser.Scene {
   private resetRunState(): void {
     this.isRunOver = false;
     this.burstRemainingMs = 0;
+    this.draftSpeedBonusActive = false;
     this.isDraftFxActive = false;
     this.activeDraftVehicle = null;
     this.speedLineSpawnAccumulatorMs = 0;
     this.trailSpawnAccumulatorMs = 0;
     this.currentChain = 0;
     this.currentScrollStep = CONFIG.BASE_SCROLL_SPEED;
-    this.previousPlayerX = 0;
   }
 
   private clearPlayerTrail(): void {
