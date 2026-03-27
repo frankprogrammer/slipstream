@@ -34,8 +34,11 @@ export const CONFIG = {
   // ── Slipstream ──
   SLIPSTREAM_ZONE_WIDTH: 80, // pixels wide (centered behind vehicle)
   SLIPSTREAM_ZONE_DEPTH: 120, // pixels below vehicle
-  DRAFT_FILL_RATE: 0.02, // per frame (~1.5s at 60fps to fill)
-  DRAFT_SPEED_BONUS: 1.0, // added to scroll speed while actively drafting
+  DRAFT_FILL_RATE: 0.04, // per frame (~0.75s at 60fps to fill)
+  /** Added to persistent world speed each time the draft meter fills (not on zone enter). */
+  DRAFT_SPEED_BONUS: 0.2,
+  /** Max total extra speed from completed drafts in one run (stacks until cap). */
+  DRAFT_SPEED_BONUS_MAX: 0.75,
   SLINGSHOT_SPEED_BURST: 2.0, // added to scroll speed
   SLINGSHOT_BURST_DURATION: 500, // ms
 
@@ -91,9 +94,13 @@ export const CONFIG = {
   CHAIN_POP_DURATION: 200, // ms
 
   // ── Speed Lines Particle Config ──
-  SPEED_LINES_BASE_ALPHA: 0.3,
-  SPEED_LINES_MAX_ALPHA: 0.8,
+  SPEED_LINES_BASE_ALPHA: 0.55,
+  SPEED_LINES_MAX_ALPHA: 0.95,
   SPEED_LINES_FREQUENCY: 50, // ms between particles
+  SPEED_LINES_WIDTH_MIN: 6,
+  SPEED_LINES_WIDTH_MAX: 12,
+  SPEED_LINES_HEIGHT_MIN: 52,
+  SPEED_LINES_HEIGHT_MAX: 100,
 
   // ── Draft Glow ──
   DRAFT_GLOW_PULSE_SPEED: 800, // ms per pulse cycle
@@ -104,5 +111,4 @@ export const CONFIG = {
   // ── Swipe Input ──
   SWIPE_THRESHOLD: 30, // minimum pixels for swipe detection
   SWIPE_MAX_TIME: 300, // max ms for a swipe gesture
-
 } as const;

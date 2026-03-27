@@ -12,7 +12,7 @@ import { THEME } from '../skins/theme';
  * When the player overlaps this zone:
  * 1. Emit 'draft-start' event (first frame of overlap)
  * 2. Fill draft meter at CONFIG.DRAFT_FILL_RATE per frame
- * 3. When meter fills OR player exits zone → emit 'draft-complete'
+ * 3. When meter fills → emit 'draft-complete'
  *
  * When player exits without filling meter → emit 'draft-cancel'
  *

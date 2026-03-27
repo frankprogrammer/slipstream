@@ -63,10 +63,11 @@ export const THEME = {
     playerBody: COLORS.LAVENDER_VIOLET,
     playerOutline: COLORS.VERY_SOFT_BLUE,
     playerTrail: COLORS.CORNFLOWER_BLUE,
+    /** Partner color while drafting (trail lerps between `playerTrail` and this). */
+    playerTrailDraftPulseTeal: COLORS.AQUAMARINE,
 
     draftMeterBg: COLORS.CHARCOAL_BLUE,
     draftMeterFill: COLORS.ELECTRIC_CYAN,
-    speedLine: COLORS.ELECTRIC_CYAN,
     draftGlow: COLORS.AQUAMARINE,
     milestoneFlash: COLORS.LAVENDER_VIOLET,
 

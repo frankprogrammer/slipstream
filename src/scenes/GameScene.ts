@@ -56,7 +56,8 @@ export class GameScene extends Phaser.Scene {
   private readonly dashLength = 36;
   private readonly dashGap = 28;
   private burstRemainingMs = 0;
-  private draftSpeedBonusActive = false;
+  /** Cumulative speed from completed draft meters; persists after leaving the zone. */
+  private persistentDraftSpeedBonus = 0;
   private isRunOver = false;
   private isDraftFxActive = false;
   private activeDraftVehicle: Phaser.GameObjects.Rectangle | null = null;
@@ -65,6 +66,7 @@ export class GameScene extends Phaser.Scene {
   private trailSpawnAccumulatorMs = 0;
   private currentChain = 0;
   private currentScrollStep: number = CONFIG.BASE_SCROLL_SPEED;
+  private currentWorldSpeedBonus = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -145,7 +147,7 @@ export class GameScene extends Phaser.Scene {
 
     this.laneSystem.update();
     this.scrollRoad(delta);
-    this.trafficSpawner.update(delta);
+    this.trafficSpawner.update(delta, this.currentWorldSpeedBonus);
     this.slipstreamZone.update(delta);
     this.collisionSystem.update();
     this.chainManager.update(delta, this.slipstreamZone.isCurrentlyDrafting());
@@ -280,8 +282,9 @@ export class GameScene extends Phaser.Scene {
   private scrollRoad(delta: number): void {
     const speedScale = delta / (1000 / 60);
     this.burstRemainingMs = Math.max(0, this.burstRemainingMs - delta);
-    const draftSpeed = this.draftSpeedBonusActive ? CONFIG.DRAFT_SPEED_BONUS : 0;
+    const draftSpeed = this.persistentDraftSpeedBonus;
     const burstSpeed = this.burstRemainingMs > 0 ? CONFIG.SLINGSHOT_SPEED_BURST : 0;
+    this.currentWorldSpeedBonus = draftSpeed + burstSpeed;
     const scrollStep = (CONFIG.BASE_SCROLL_SPEED + draftSpeed + burstSpeed) * speedScale;
     this.currentScrollStep = scrollStep;
     this.scoreManager.addDistance(scrollStep);
@@ -299,6 +302,10 @@ export class GameScene extends Phaser.Scene {
     const chain = this.chainManager.completeDraft();
     this.scoreManager.addDraftCompleteBonus(chain);
     this.burstRemainingMs = CONFIG.SLINGSHOT_BURST_DURATION;
+    this.persistentDraftSpeedBonus = Math.min(
+      this.persistentDraftSpeedBonus + CONFIG.DRAFT_SPEED_BONUS,
+      CONFIG.DRAFT_SPEED_BONUS_MAX
+    );
     this.handleDraftEnd();
 
     this.tweens.add({
@@ -329,7 +336,6 @@ export class GameScene extends Phaser.Scene {
 
   private handleDraftStart(vehicle: Phaser.GameObjects.Rectangle): void {
     this.clearDraftEffects();
-    this.draftSpeedBonusActive = true;
     this.isDraftFxActive = true;
     this.activeDraftVehicle = vehicle;
     vehicle.setStrokeStyle(4, THEME.TOKENS.draftGlow);
@@ -349,7 +355,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleDraftEnd(): void {
-    this.draftSpeedBonusActive = false;
     this.clearDraftEffects();
   }
 
@@ -378,6 +383,7 @@ export class GameScene extends Phaser.Scene {
 
     for (let i = this.speedLines.length - 1; i >= 0; i -= 1) {
       const line = this.speedLines[i];
+      line.setFillStyle(this.getSpeedLineFillColor());
       line.y += speedLineVelocity;
       line.alpha = Math.max(0, line.alpha - 0.025 * speedScale);
       if (line.y - line.height / 2 > this.scale.height + 24 || line.alpha <= 0) {
@@ -413,7 +419,13 @@ export class GameScene extends Phaser.Scene {
         );
     const y = Phaser.Math.Between(0, this.scale.height - 120);
     const line = this.add
-      .rectangle(x, y, Phaser.Math.Between(2, 4), Phaser.Math.Between(18, 34), THEME.TOKENS.speedLine)
+      .rectangle(
+        x,
+        y,
+        Phaser.Math.Between(CONFIG.SPEED_LINES_WIDTH_MIN, CONFIG.SPEED_LINES_WIDTH_MAX),
+        Phaser.Math.Between(CONFIG.SPEED_LINES_HEIGHT_MIN, CONFIG.SPEED_LINES_HEIGHT_MAX),
+        this.getSpeedLineFillColor()
+      )
       .setDepth(14)
       .setAlpha(
         Phaser.Math.Clamp(
@@ -504,7 +516,10 @@ export class GameScene extends Phaser.Scene {
 
       // Fade from fully opaque at the start to fully transparent at the end.
       const segmentAlpha = overallAlpha * (1 - (t0 + t1) * 0.5);
-      this.playerTrailGraphics.fillStyle(THEME.TOKENS.playerTrail, Phaser.Math.Clamp(segmentAlpha, 0, 1));
+      this.playerTrailGraphics.fillStyle(
+        this.getPlayerTrailFillColor(),
+        Phaser.Math.Clamp(segmentAlpha, 0, 1)
+      );
       this.playerTrailGraphics.beginPath();
       this.playerTrailGraphics.moveTo(l0.x, l0.y);
       this.playerTrailGraphics.lineTo(l1.x, l1.y);
@@ -513,6 +528,27 @@ export class GameScene extends Phaser.Scene {
       this.playerTrailGraphics.closePath();
       this.playerTrailGraphics.fillPath();
     }
+  }
+
+  /** While actively drafting, pulse trail color between base blue and teal (same timing as draft vehicle glow). */
+  private getPlayerTrailFillColor(): number {
+    if (!this.slipstreamZone.isCurrentlyDrafting()) {
+      return THEME.TOKENS.playerTrail;
+    }
+
+    const glowPulseMs = Phaser.Math.Clamp(
+      CONFIG.DRAFT_GLOW_PULSE_SPEED - chainIntensityFor(this.currentChain) * 350,
+      260,
+      CONFIG.DRAFT_GLOW_PULSE_SPEED
+    );
+    const t = Math.sin((this.time.now / glowPulseMs) * Math.PI * 2) * 0.5 + 0.5;
+    const c0 = Phaser.Display.Color.IntegerToColor(THEME.TOKENS.playerTrail);
+    const c1 = Phaser.Display.Color.IntegerToColor(THEME.TOKENS.playerTrailDraftPulseTeal);
+    return Phaser.Display.Color.GetColor(
+      Phaser.Math.Linear(c0.red, c1.red, t),
+      Phaser.Math.Linear(c0.green, c1.green, t),
+      Phaser.Math.Linear(c0.blue, c1.blue, t)
+    );
   }
 
   private buildSmoothedTrailPoints(
@@ -573,13 +609,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private updateSkyGradient(): void {
+  /** Same lerp as the sky rectangle; used for speed-line inverse color. */
+  private getSkyGradientFillColor(): number {
     const distance = this.scoreManager.getDistancePx();
     const segmentLength = CONFIG.SKY_TRANSITION_DISTANCE;
     const colorCount = THEME.SKY_GRADIENT.length;
 
     if (colorCount < 2) {
-      return;
+      return THEME.TOKENS.skyFill;
     }
 
     const phase = distance / segmentLength;
@@ -591,8 +628,18 @@ export class GameScene extends Phaser.Scene {
     const from = Phaser.Display.Color.HexStringToColor(THEME.SKY_GRADIENT[fromIndex]);
     const to = Phaser.Display.Color.HexStringToColor(THEME.SKY_GRADIENT[toIndex]);
     const lerped = Phaser.Display.Color.Interpolate.ColorWithColor(from, to, 1, t);
-    const colorValue = Phaser.Display.Color.GetColor(lerped.r, lerped.g, lerped.b);
-    this.skyBg.setFillStyle(colorValue, 1);
+    return Phaser.Display.Color.GetColor(lerped.r, lerped.g, lerped.b);
+  }
+
+  /** Perceptual complement to the active sky: RGB inverse so streaks stay readable on any sunset phase. */
+  private getSpeedLineFillColor(): number {
+    const sky = this.getSkyGradientFillColor();
+    const c = Phaser.Display.Color.IntegerToColor(sky);
+    return Phaser.Display.Color.GetColor(255 - c.red, 255 - c.green, 255 - c.blue);
+  }
+
+  private updateSkyGradient(): void {
+    this.skyBg.setFillStyle(this.getSkyGradientFillColor(), 1);
   }
 
   private handleCollision(): void {
@@ -612,13 +659,14 @@ export class GameScene extends Phaser.Scene {
   private resetRunState(): void {
     this.isRunOver = false;
     this.burstRemainingMs = 0;
-    this.draftSpeedBonusActive = false;
+    this.persistentDraftSpeedBonus = 0;
     this.isDraftFxActive = false;
     this.activeDraftVehicle = null;
     this.speedLineSpawnAccumulatorMs = 0;
     this.trailSpawnAccumulatorMs = 0;
     this.currentChain = 0;
     this.currentScrollStep = CONFIG.BASE_SCROLL_SPEED;
+    this.currentWorldSpeedBonus = 0;
   }
 
   private clearPlayerTrail(): void {

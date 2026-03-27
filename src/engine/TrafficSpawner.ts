@@ -44,7 +44,7 @@ export class TrafficSpawner {
     this.playerHeight = playerHeight;
   }
 
-  update(delta: number): void {
+  update(delta: number, worldSpeedBonus = 0): void {
     this.elapsedMs += delta;
     this.spawnAccumulatorMs += delta;
 
@@ -68,7 +68,7 @@ export class TrafficSpawner {
     const effectiveSpeeds = this.vehicleSpeeds.map((_, index) => this.getSafeSpeedForIndex(index));
     for (let i = this.vehicles.length - 1; i >= 0; i -= 1) {
       const vehicle = this.vehicles[i];
-      vehicle.y += effectiveSpeeds[i] * speedScale;
+      vehicle.y += (effectiveSpeeds[i] + worldSpeedBonus) * speedScale;
 
       if (vehicle.y - vehicle.height / 2 > this.scene.scale.height + 24) {
         vehicle.destroy();
