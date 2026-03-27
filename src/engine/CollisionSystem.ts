@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import Phaser from "phaser";
 
 /**
  * CollisionSystem — Player vs vehicle collision detection.
@@ -28,7 +28,7 @@ export class CollisionSystem {
     scene: Phaser.Scene,
     player: Phaser.GameObjects.Rectangle,
     getTrafficVehicles: () => readonly Phaser.GameObjects.Rectangle[],
-    onCollision: () => void
+    onCollision: () => void,
   ) {
     this.scene = scene;
     this.player = player;
@@ -47,7 +47,12 @@ export class CollisionSystem {
     this.playerBounds.height -= verticalTrim * 2;
     for (const vehicle of this.getTrafficVehicles()) {
       vehicle.getBounds(this.vehicleBounds);
-      if (!Phaser.Geom.Intersects.RectangleToRectangle(this.playerBounds, this.vehicleBounds)) {
+      if (
+        !Phaser.Geom.Intersects.RectangleToRectangle(
+          this.playerBounds,
+          this.vehicleBounds,
+        )
+      ) {
         continue;
       }
 

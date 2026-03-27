@@ -170,8 +170,14 @@ export class GameScene extends Phaser.Scene {
 
     this.laneSystem.update();
     this.scrollRoad(delta);
+    const speedScale = delta / (1000 / 60);
+    const baseScrollThisFrame = CONFIG.BASE_SCROLL_SPEED * speedScale;
+    const draftWorldScrollRatio =
+      baseScrollThisFrame > 0
+        ? this.currentScrollStep / baseScrollThisFrame
+        : 1;
     this.trafficSpawner.update(delta, this.currentWorldSpeedBonus);
-    this.slipstreamZone.update(delta);
+    this.slipstreamZone.update(delta, draftWorldScrollRatio);
     this.collisionSystem.update();
     this.chainManager.update(delta, this.slipstreamZone.isCurrentlyDrafting());
     this.updateSpeedLines(delta);

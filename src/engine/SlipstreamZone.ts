@@ -1,6 +1,6 @@
-import Phaser from 'phaser';
-import { CONFIG } from '../config';
-import { THEME } from '../skins/theme';
+import Phaser from "phaser";
+import { CONFIG } from "../config";
+import { THEME } from "../skins/theme";
 
 /**
  * SlipstreamZone — Detects when the player is drafting behind a vehicle.
@@ -11,7 +11,7 @@ import { THEME } from '../skins/theme';
  *
  * When the player overlaps this zone:
  * 1. Emit 'draft-start' event (first frame of overlap)
- * 2. Fill draft meter at CONFIG.DRAFT_FILL_RATE per frame
+ * 2. Fill draft meter at CONFIG.DRAFT_FILL_RATE × (world scroll speed / base scroll speed) per frame
  * 3. When meter fills → emit 'draft-complete'
  *
  * When player exits without filling meter → emit 'draft-cancel'
@@ -40,7 +40,7 @@ export class SlipstreamZone {
     scene: Phaser.Scene,
     player: Phaser.GameObjects.Rectangle,
     getTrafficVehicles: () => readonly Phaser.GameObjects.Rectangle[],
-    debugDraw = false
+    debugDraw = false,
   ) {
     this.scene = scene;
     this.player = player;
@@ -50,7 +50,10 @@ export class SlipstreamZone {
     }
   }
 
-  update(delta: number): void {
+  /**
+   * @param worldScrollSpeedRatio — current scroll step ÷ (BASE_SCROLL_SPEED × frame scale); keeps draft fill pace with world speed
+   */
+  update(delta: number, worldScrollSpeedRatio: number = 1): void {
     const vehicles = this.getTrafficVehicles();
     const overlapVehicle = this.findOverlappingVehicle(vehicles);
 
@@ -59,7 +62,7 @@ export class SlipstreamZone {
         this.isDrafting = false;
         this.draftMeter = 0;
         this.activeVehicle = null;
-        this.scene.events.emit('draft-cancel');
+        this.scene.events.emit("draft-cancel");
       }
       this.lockUntilExit = false;
       this.redrawDebug(vehicles, null);
@@ -75,19 +78,23 @@ export class SlipstreamZone {
       this.isDrafting = true;
       this.draftMeter = 0;
       this.activeVehicle = overlapVehicle;
-      this.scene.events.emit('draft-start', overlapVehicle);
+      this.scene.events.emit("draft-start", overlapVehicle);
     }
 
     const speedScale = delta / (1000 / 60);
-    this.draftMeter = Math.min(1, this.draftMeter + CONFIG.DRAFT_FILL_RATE * speedScale);
-    this.scene.events.emit('draft-progress', this.draftMeter);
+    const fill =
+      CONFIG.DRAFT_FILL_RATE *
+      speedScale *
+      Phaser.Math.Clamp(worldScrollSpeedRatio, 0.15, 5);
+    this.draftMeter = Math.min(1, this.draftMeter + fill);
+    this.scene.events.emit("draft-progress", this.draftMeter);
 
     if (this.draftMeter >= 1) {
       this.isDrafting = false;
       this.draftMeter = 0;
       this.lockUntilExit = true;
       this.activeVehicle = overlapVehicle;
-      this.scene.events.emit('draft-complete', overlapVehicle);
+      this.scene.events.emit("draft-complete", overlapVehicle);
     }
 
     this.redrawDebug(vehicles, overlapVehicle);
@@ -106,7 +113,7 @@ export class SlipstreamZone {
   }
 
   private findOverlappingVehicle(
-    vehicles: readonly Phaser.GameObjects.Rectangle[]
+    vehicles: readonly Phaser.GameObjects.Rectangle[],
   ): Phaser.GameObjects.Rectangle | null {
     this.player.getBounds(this.playerBounds);
     let closest: Phaser.GameObjects.Rectangle | null = null;
@@ -114,7 +121,12 @@ export class SlipstreamZone {
 
     for (const vehicle of vehicles) {
       this.getZoneRect(vehicle, this.zoneRect);
-      if (!Phaser.Geom.Intersects.RectangleToRectangle(this.playerBounds, this.zoneRect)) {
+      if (
+        !Phaser.Geom.Intersects.RectangleToRectangle(
+          this.playerBounds,
+          this.zoneRect,
+        )
+      ) {
         continue;
       }
 
@@ -128,7 +140,10 @@ export class SlipstreamZone {
     return closest;
   }
 
-  private getZoneRect(vehicle: Phaser.GameObjects.Rectangle, out: Phaser.Geom.Rectangle): void {
+  private getZoneRect(
+    vehicle: Phaser.GameObjects.Rectangle,
+    out: Phaser.Geom.Rectangle,
+  ): void {
     const zoneWidth = Math.min(CONFIG.SLIPSTREAM_ZONE_WIDTH, vehicle.width);
     const zoneDepth = CONFIG.SLIPSTREAM_ZONE_DEPTH;
     out.x = vehicle.x - zoneWidth / 2;
@@ -139,7 +154,7 @@ export class SlipstreamZone {
 
   private redrawDebug(
     vehicles: readonly Phaser.GameObjects.Rectangle[],
-    overlapVehicle: Phaser.GameObjects.Rectangle | null
+    overlapVehicle: Phaser.GameObjects.Rectangle | null,
   ): void {
     if (!this.debugGraphics) {
       return;
@@ -148,14 +163,25 @@ export class SlipstreamZone {
     this.debugGraphics.clear();
     for (const vehicle of vehicles) {
       this.getZoneRect(vehicle, this.zoneRect);
-      const isActive = overlapVehicle === vehicle || this.activeVehicle === vehicle;
+      const isActive =
+        overlapVehicle === vehicle || this.activeVehicle === vehicle;
       this.debugGraphics.fillStyle(
         isActive ? THEME.TOKENS.debugZoneActive : THEME.TOKENS.debugZoneIdle,
-        isActive ? 0.25 : 0.15
+        isActive ? 0.25 : 0.15,
       );
-      this.debugGraphics.fillRect(this.zoneRect.x, this.zoneRect.y, this.zoneRect.width, this.zoneRect.height);
+      this.debugGraphics.fillRect(
+        this.zoneRect.x,
+        this.zoneRect.y,
+        this.zoneRect.width,
+        this.zoneRect.height,
+      );
       this.debugGraphics.lineStyle(1, THEME.TOKENS.debugZoneOutline, 0.6);
-      this.debugGraphics.strokeRect(this.zoneRect.x, this.zoneRect.y, this.zoneRect.width, this.zoneRect.height);
+      this.debugGraphics.strokeRect(
+        this.zoneRect.x,
+        this.zoneRect.y,
+        this.zoneRect.width,
+        this.zoneRect.height,
+      );
     }
   }
 }

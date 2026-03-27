@@ -27,18 +27,22 @@ export const CONFIG = {
 
   // ── Scrolling ──
   BASE_SCROLL_SPEED: 4.25, // pixels per frame at start
-  MAX_SCROLL_SPEED: 8, // cap
+  MAX_SCROLL_SPEED: 10, // cap
   SPEED_RAMP_RATE: 0.001, // speed increase per frame (very gradual)
   PARALLAX_SPEEDS: [0.2, 0.5, 1.0] as readonly number[], // sky, midground, road
 
   // ── Slipstream ──
   SLIPSTREAM_ZONE_WIDTH: 80, // pixels wide (centered behind vehicle)
   SLIPSTREAM_ZONE_DEPTH: 120, // pixels below vehicle
-  DRAFT_FILL_RATE: 0.04, // per frame (~0.75s at 60fps to fill)
+  /**
+   * Draft meter fill per frame at BASE_SCROLL_SPEED (× delta normalization).
+   * Actual fill is multiplied by (current scroll step / base scroll step) so faster runs keep similar draft timing.
+   */
+  DRAFT_FILL_RATE: 0.04,
   /** Added to persistent world speed each time the draft meter fills (not on zone enter). */
-  DRAFT_SPEED_BONUS: 0.2,
+  DRAFT_SPEED_BONUS: 0.15,
   /** Max total extra speed from completed drafts in one run (stacks until cap). */
-  DRAFT_SPEED_BONUS_MAX: 0.75,
+  DRAFT_SPEED_BONUS_MAX: 5,
   SLINGSHOT_SPEED_BURST: 2.0, // added to scroll speed
   SLINGSHOT_BURST_DURATION: 500, // ms
 
@@ -120,7 +124,4 @@ export const CONFIG = {
   // ── Player ──
   PLAYER_Y_POSITION: 0.8, // fraction of screen height from top (80% down = near bottom)
 
-  // ── Swipe Input ──
-  SWIPE_THRESHOLD: 30, // minimum pixels for swipe detection
-  SWIPE_MAX_TIME: 300, // max ms for a swipe gesture
 } as const;
