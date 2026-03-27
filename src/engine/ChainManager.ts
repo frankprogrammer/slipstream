@@ -1,5 +1,5 @@
-import Phaser from 'phaser';
-import { CONFIG } from '../config';
+import Phaser from "phaser";
+import { CONFIG } from "../config";
 
 /**
  * ChainManager — Tracks the slipstream chain multiplier.
@@ -14,6 +14,7 @@ import { CONFIG } from '../config';
  * - ×10: gold screen flash + "PERFECT" text + full chord sound (THE clip moment)
  * - ×15: cascading arpeggio sound
  * - ×20: euphoric sound
+ *
  */
 export class ChainManager {
   private readonly scene: Phaser.Scene;
@@ -32,8 +33,11 @@ export class ChainManager {
     }
 
     this.timeSinceDraftMs += delta;
-    if (this.currentChain > 0 && this.timeSinceDraftMs >= CONFIG.CHAIN_TIMEOUT) {
-      this.resetChain('timeout');
+    if (
+      this.currentChain > 0 &&
+      this.timeSinceDraftMs >= CONFIG.CHAIN_TIMEOUT
+    ) {
+      this.resetChain("timeout");
     }
   }
 
@@ -42,23 +46,23 @@ export class ChainManager {
     this.bestChain = Math.max(this.bestChain, this.currentChain);
     this.timeSinceDraftMs = 0;
 
-    this.scene.events.emit('chain-changed', this.currentChain);
+    this.scene.events.emit("chain-changed", this.currentChain);
     if (CONFIG.CHAIN_MILESTONES.includes(this.currentChain)) {
-      this.scene.events.emit('chain-milestone', this.currentChain);
+      this.scene.events.emit("chain-milestone", this.currentChain);
     }
 
     return this.currentChain;
   }
 
-  resetChain(reason: 'collision' | 'timeout'): void {
+  resetChain(reason: "collision" | "timeout"): void {
     if (this.currentChain === 0) {
       return;
     }
 
     this.currentChain = 0;
     this.timeSinceDraftMs = 0;
-    this.scene.events.emit('chain-reset', reason);
-    this.scene.events.emit('chain-changed', this.currentChain);
+    this.scene.events.emit("chain-reset", reason);
+    this.scene.events.emit("chain-changed", this.currentChain);
   }
 
   getCurrentChain(): number {
