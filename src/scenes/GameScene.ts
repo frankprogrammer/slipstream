@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
+import { ChainManager } from '../engine/ChainManager';
 import { LaneSystem } from '../engine/LaneSystem';
 import { SlipstreamZone } from '../engine/SlipstreamZone';
 import { TrafficSpawner } from '../engine/TrafficSpawner';
@@ -30,15 +31,18 @@ export class GameScene extends Phaser.Scene {
   private laneSystem!: LaneSystem;
   private trafficSpawner!: TrafficSpawner;
   private slipstreamZone!: SlipstreamZone;
+  private chainManager!: ChainManager;
 
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
   private draftMeterBg!: Phaser.GameObjects.Rectangle;
   private draftMeterFill!: Phaser.GameObjects.Rectangle;
+  private chainText!: Phaser.GameObjects.Text;
 
   private roadLeft = 0;
   private roadWidth = 0;
   private readonly dashLength = 36;
   private readonly dashGap = 28;
+  private burstRemainingMs = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -67,15 +71,21 @@ export class GameScene extends Phaser.Scene {
     this.createLaneDashes(height);
     this.createPlayer(height);
     this.createDraftMeter();
+    this.createChainText();
     this.laneSystem = new LaneSystem(this, this.player, this.laneCenters);
     this.trafficSpawner = new TrafficSpawner(this, this.laneCenters);
+    this.chainManager = new ChainManager(this);
     this.slipstreamZone = new SlipstreamZone(
       this,
       this.player,
       () => this.trafficSpawner.getVehicles(),
       true
     );
+    this.events.on('draft-complete', this.handleDraftComplete, this);
+    this.events.on('chain-changed', this.handleChainChanged, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off('draft-complete', this.handleDraftComplete, this);
+      this.events.off('chain-changed', this.handleChainChanged, this);
       this.laneSystem.destroy();
       this.slipstreamZone.destroy();
       this.trafficSpawner.destroy();
@@ -89,6 +99,7 @@ export class GameScene extends Phaser.Scene {
     this.scrollRoad(delta);
     this.trafficSpawner.update(delta);
     this.slipstreamZone.update(delta);
+    this.chainManager.update(delta, this.slipstreamZone.isCurrentlyDrafting());
     this.updateDraftMeterUI();
   }
 
@@ -140,6 +151,18 @@ export class GameScene extends Phaser.Scene {
       .setVisible(false);
   }
 
+  private createChainText(): void {
+    this.chainText = this.add
+      .text(this.scale.width / 2, 56, 'x0', {
+        fontFamily: 'Arial',
+        fontSize: '34px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5)
+      .setDepth(15)
+      .setShadow(0, 2, '#4A3F35', 4, false, true);
+  }
+
   private updateDraftMeterUI(): void {
     const meterWidth = this.draftMeterBg.width;
     const meterY = this.player.y - 62;
@@ -158,7 +181,9 @@ export class GameScene extends Phaser.Scene {
 
   private scrollRoad(delta: number): void {
     const speedScale = delta / (1000 / 60);
-    const scrollStep = CONFIG.BASE_SCROLL_SPEED * speedScale;
+    this.burstRemainingMs = Math.max(0, this.burstRemainingMs - delta);
+    const burstSpeed = this.burstRemainingMs > 0 ? CONFIG.SLINGSHOT_SPEED_BURST : 0;
+    const scrollStep = (CONFIG.BASE_SCROLL_SPEED + burstSpeed) * speedScale;
     const wrapY = this.scale.height + this.dashLength;
 
     for (const dash of this.roadDashes) {
@@ -167,5 +192,30 @@ export class GameScene extends Phaser.Scene {
         dash.y = -this.dashLength;
       }
     }
+  }
+
+  private handleDraftComplete(): void {
+    this.chainManager.completeDraft();
+    this.burstRemainingMs = CONFIG.SLINGSHOT_BURST_DURATION;
+
+    this.tweens.add({
+      targets: this.player,
+      scaleX: 1.15,
+      scaleY: 0.9,
+      duration: 70,
+      yoyo: true,
+      ease: 'Sine.Out',
+    });
+  }
+
+  private handleChainChanged(chain: number): void {
+    this.chainText.setText(`x${chain}`);
+    this.chainText.setScale(CONFIG.CHAIN_POP_SCALE);
+    this.tweens.add({
+      targets: this.chainText,
+      scale: 1,
+      duration: CONFIG.CHAIN_POP_DURATION,
+      ease: 'Back.easeOut',
+    });
   }
 }
