@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
-import { ShareCard } from '../ui/ShareCard';
 
 /**
  * GameOverScene — The single end-of-run screen.
@@ -18,7 +17,6 @@ interface RunData {
 }
 
 export class GameOverScene extends Phaser.Scene {
-  private readonly shareCard = new ShareCard();
   private runData: RunData = {
     score: 0,
     bestChain: 0,
@@ -102,23 +100,6 @@ export class GameOverScene extends Phaser.Scene {
 
     retry.on('pointerdown', () => {
       this.scene.start('GameScene');
-    });
-
-    const share = this.add
-      .rectangle(width / 2, height * 0.72, 200, 56, CONFIG.PALETTE.CORAL)
-      .setStrokeStyle(3, CONFIG.PALETTE.CREAM)
-      .setInteractive({ useHandCursor: true });
-
-    this.add
-      .text(share.x, share.y, 'SHARE', {
-        fontFamily: 'Arial',
-        fontSize: '28px',
-        color: '#FFF8F0',
-      })
-      .setOrigin(0.5);
-
-    share.on('pointerdown', () => {
-      this.shareCard.download(this.runData);
     });
   }
 }
