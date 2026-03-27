@@ -246,6 +246,18 @@ The speed lines on the side of the game are barely noticeable. Let's make them w
 
 Can we make it so the speed line colors are always the inverse color of the current sunset color that is active?
 
+### 59
+
+Can we make the speed lines narrower?
+
+### 60
+
+can we make the aspect ratio of the game 9:19.5 so it remebles phones better
+
+### 61
+
+the game is also off centered to the right.
+
 ---
 
 ## Future prompts

@@ -8,15 +8,23 @@
   <title>Slipstream</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0a0f; }
-    #game-container {
+    html, body {
       width: 100%;
       height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      overflow: hidden;
+      background: #0c0a0f;
+      position: relative;
     }
-    canvas { display: block; touch-action: none; }
+    /* Let Phaser ScaleManager center the canvas — flex here fights FIT + autoCenter and can shift content sideways. */
+    #game-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    canvas { display: block; touch-action: none; margin: 0; }
   </style>
 </head>
 <body>

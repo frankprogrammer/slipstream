@@ -15,9 +15,9 @@ export interface TrafficPhase {
 }
 
 export const CONFIG = {
-  // ── Canvas ──
+  // ── Canvas (portrait 9 : 19.5 — common phone proportion) ──
   GAME_WIDTH: 390,
-  GAME_HEIGHT: 844,
+  GAME_HEIGHT: 845, // 390 × (19.5 / 9) → 9 : 19.5 portrait
 
   // ── Lanes ──
   LANE_COUNT: 3,
@@ -97,8 +97,8 @@ export const CONFIG = {
   SPEED_LINES_BASE_ALPHA: 0.55,
   SPEED_LINES_MAX_ALPHA: 0.95,
   SPEED_LINES_FREQUENCY: 50, // ms between particles
-  SPEED_LINES_WIDTH_MIN: 6,
-  SPEED_LINES_WIDTH_MAX: 12,
+  SPEED_LINES_WIDTH_MIN: 3,
+  SPEED_LINES_WIDTH_MAX: 6,
   SPEED_LINES_HEIGHT_MIN: 52,
   SPEED_LINES_HEIGHT_MAX: 100,
 
