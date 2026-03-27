@@ -228,10 +228,15 @@ export class GameScene extends Phaser.Scene {
       throw new Error("Failed to create playerTrailCanvas texture");
     }
     this.trailCanvasTexture = trailTex;
+    const trailTexKey = this.textures.get("playerTrailCanvas");
+    if (trailTexKey?.setFilter) {
+      trailTexKey.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    }
     this.trailImage = this.add
       .image(0, 0, "playerTrailCanvas")
       .setOrigin(0, 0)
       .setDepth(9);
+    (this.trailImage as unknown as { roundPixels?: boolean }).roundPixels = true;
   }
 
   private createDraftMeter(): void {
@@ -575,13 +580,18 @@ export class GameScene extends Phaser.Scene {
     const n = ribbon.length;
     const headWidth = this.player.width * 0.75;
     const tailWidth = this.player.width * 0.25;
-    const overallAlpha = Phaser.Math.Clamp(
+    const rawAlpha = Phaser.Math.Clamp(
       0.7 + (speedFactor - 1) * 0.2,
       0.7,
       1,
     );
+    const overallAlpha = Math.round(rawAlpha * 500) / 500;
     const colorInt = this.getPlayerTrailFillColor(delta);
     const rgb = Phaser.Display.Color.IntegerToColor(colorInt);
+    const r = Math.round(rgb.red);
+    const g = Math.round(rgb.green);
+    const b = Math.round(rgb.blue);
+    const tailA = Math.round(overallAlpha * 0.04 * 1000) / 1000;
 
     ctx.save();
     // One continuous stroke so round joins close corners (segment+butt strokes leave wedge gaps — “open book”).
@@ -590,25 +600,22 @@ export class GameScene extends Phaser.Scene {
     ctx.lineCap = "round";
     ctx.lineWidth = Math.max(2, Phaser.Math.Linear(headWidth, tailWidth, 0.42));
 
-    const hx = ribbon[0].x;
-    const hy = ribbon[0].y;
-    const tx = ribbon[n - 1].x;
-    const ty = ribbon[n - 1].y;
+    const hx = this.snapTrailCanvasCoord(ribbon[0].x);
+    const hy = this.snapTrailCanvasCoord(ribbon[0].y);
+    const tx = this.snapTrailCanvasCoord(ribbon[n - 1].x);
+    const ty = this.snapTrailCanvasCoord(ribbon[n - 1].y);
     const grad = ctx.createLinearGradient(hx, hy, tx, ty);
-    grad.addColorStop(
-      0,
-      `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha})`,
-    );
-    grad.addColorStop(
-      1,
-      `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha * 0.04})`,
-    );
+    grad.addColorStop(0, `rgba(${r},${g},${b},${overallAlpha})`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},${tailA})`);
     ctx.strokeStyle = grad;
 
     ctx.beginPath();
-    ctx.moveTo(ribbon[0].x, ribbon[0].y);
+    ctx.moveTo(hx, hy);
     for (let i = 1; i < n; i += 1) {
-      ctx.lineTo(ribbon[i].x, ribbon[i].y);
+      ctx.lineTo(
+        this.snapTrailCanvasCoord(ribbon[i].x),
+        this.snapTrailCanvasCoord(ribbon[i].y),
+      );
     }
     ctx.stroke();
     ctx.restore();
@@ -629,9 +636,11 @@ export class GameScene extends Phaser.Scene {
       260,
       CONFIG.DRAFT_GLOW_PULSE_SPEED,
     );
+    // Narrower lerp range + heavier smoothing reduces per-frame RGB drift on mobile GPUs.
     const targetT =
-      Math.sin((this.time.now / glowPulseMs) * Math.PI * 2) * 0.5 + 0.5;
-    const smooth = 1 - Math.exp(-delta * 0.005);
+      0.5 +
+      0.32 * Math.sin((this.time.now / glowPulseMs) * Math.PI * 2);
+    const smooth = 1 - Math.exp(-delta * 0.0032);
     this.trailDraftColorPulseT = Phaser.Math.Linear(
       this.trailDraftColorPulseT,
       targetT,
@@ -647,6 +656,11 @@ export class GameScene extends Phaser.Scene {
       Phaser.Math.Linear(c0.green, c1.green, t),
       Phaser.Math.Linear(c0.blue, c1.blue, t),
     );
+  }
+
+  /** Half-pixel grid for canvas strokes — cuts subpixel shimmer on mobile GPUs. */
+  private snapTrailCanvasCoord(v: number): number {
+    return Math.round(v * 2) / 2;
   }
 
   /** Insert points along long edges so ribbon tangents don’t jump (lane-change diagonals). */

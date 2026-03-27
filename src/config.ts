@@ -118,8 +118,8 @@ export const CONFIG = {
   TRAIL_LAPLACIAN_SMOOTH_PASSES: 2,
   /** After a lane switch ends, curve blend 1→0 over this duration (stops the trail snapping straight). */
   TRAIL_CURVE_BLEND_DECAY_MS: 2800,
-  /** Min ms between trail samples; higher = less moiré / shimmer at high speed. */
-  TRAIL_SPAWN_INTERVAL_MIN_MS: 2,
+  /** Min ms between trail samples; higher = less moiré / shimmer at high speed (mobile-friendly). */
+  TRAIL_SPAWN_INTERVAL_MIN_MS: 8,
 
   // ── Player ──
   PLAYER_Y_POSITION: 0.8, // fraction of screen height from top (80% down = near bottom)
