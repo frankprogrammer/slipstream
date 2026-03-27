@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
+import { THEME } from '../skins/theme';
 
 /**
  * HUD — Heads-up display overlay during gameplay.
@@ -35,29 +36,29 @@ export class HUD {
       .text(this.scene.scale.width / 2, 16, '0', {
         fontFamily: 'Arial',
         fontSize: '40px',
-        color: '#FFF8F0',
+        color: THEME.TOKENS.hudTextHex,
       })
       .setOrigin(0.5, 0)
       .setDepth(15)
-      .setShadow(0, 2, '#4A3F35', 4, false, true);
+      .setShadow(0, 2, THEME.TOKENS.hudShadowHex, 4, false, true);
 
     this.chainText = this.scene.add
       .text(this.scene.scale.width / 2, 86, 'x0', {
         fontFamily: 'Arial',
         fontSize: '30px',
-        color: '#FFF8F0',
+        color: THEME.TOKENS.hudTextHex,
       })
       .setOrigin(0.5, 0)
       .setDepth(15)
-      .setShadow(0, 2, '#4A3F35', 4, false, true);
+      .setShadow(0, 2, THEME.TOKENS.hudShadowHex, 4, false, true);
 
     this.draftMeterBg = this.scene.add
-      .rectangle(0, 0, 56, 8, CONFIG.PALETTE.SOFT_BROWN)
+      .rectangle(0, 0, 56, 8, THEME.TOKENS.draftMeterBg)
       .setDepth(11)
       .setVisible(false);
 
     this.draftMeterFill = this.scene.add
-      .rectangle(0, 0, 0, 6, CONFIG.PALETTE.AMBER)
+      .rectangle(0, 0, 0, 6, THEME.TOKENS.draftMeterFill)
       .setOrigin(0, 0.5)
       .setDepth(12)
       .setVisible(false);
@@ -66,13 +67,13 @@ export class HUD {
       .text(this.scene.scale.width / 2, this.scene.scale.height * 0.36, 'PERFECT!', {
         fontFamily: 'Arial',
         fontSize: '58px',
-        color: '#FFF8F0',
+        color: THEME.TOKENS.hudTextHex,
       })
       .setOrigin(0.5)
       .setDepth(41)
       .setAlpha(0)
       .setVisible(false)
-      .setShadow(0, 2, '#4A3F35', 4, false, true);
+      .setShadow(0, 2, THEME.TOKENS.hudShadowHex, 4, false, true);
   }
 
   setScore(score: number): void {

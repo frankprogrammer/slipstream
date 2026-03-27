@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
+import { THEME } from '../skins/theme';
 
 /**
  * ScrollManager — Handles parallax scrolling background layers.
@@ -18,7 +19,7 @@ import { CONFIG } from '../config';
  * - Slingshot bursts temporarily add CONFIG.SLINGSHOT_SPEED_BURST
  *
  * Sky gradient:
- * - Background color lerps through CONFIG.SKY_GRADIENT_COLORS
+ * - Background color lerps through skin theme sky gradient
  * - Transition triggered by total distance (CONFIG.SKY_TRANSITION_DISTANCE per step)
  * - Should feel organic — player shouldn't notice until they look up and the sky has changed
  */
@@ -52,12 +53,12 @@ export class ScrollManager {
   }
 
   getSkyColor(distancePx: number): number {
-    const colorCount = CONFIG.SKY_GRADIENT_COLORS.length;
+    const colorCount = THEME.SKY_GRADIENT.length;
     if (colorCount === 0) {
-      return CONFIG.PALETTE.PEACH;
+      return THEME.TOKENS.skyFill;
     }
     if (colorCount === 1) {
-      return Phaser.Display.Color.HexStringToColor(CONFIG.SKY_GRADIENT_COLORS[0]).color;
+      return Phaser.Display.Color.HexStringToColor(THEME.SKY_GRADIENT[0]).color;
     }
 
     const phase = distancePx / CONFIG.SKY_TRANSITION_DISTANCE;
@@ -66,8 +67,8 @@ export class ScrollManager {
     const toIndex = (fromIndex + 1) % colorCount;
     const t = wrappedPhase - fromIndex;
 
-    const from = Phaser.Display.Color.HexStringToColor(CONFIG.SKY_GRADIENT_COLORS[fromIndex]);
-    const to = Phaser.Display.Color.HexStringToColor(CONFIG.SKY_GRADIENT_COLORS[toIndex]);
+    const from = Phaser.Display.Color.HexStringToColor(THEME.SKY_GRADIENT[fromIndex]);
+    const to = Phaser.Display.Color.HexStringToColor(THEME.SKY_GRADIENT[toIndex]);
     const lerped = Phaser.Display.Color.Interpolate.ColorWithColor(from, to, 1, t);
     return Phaser.Display.Color.GetColor(lerped.r, lerped.g, lerped.b);
   }

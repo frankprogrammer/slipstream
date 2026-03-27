@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG, TrafficPhase } from '../config';
+import { THEME } from '../skins/theme';
 
 /**
  * TrafficSpawner — Spawns and manages traffic vehicles.
@@ -110,8 +111,8 @@ export class TrafficSpawner {
     const speed = CONFIG.VEHICLE_BASE_SPEED * (1 + variance);
 
     const vehicle = this.scene.add
-      .rectangle(this.laneCenters[laneIndex], -height, width, height, CONFIG.PALETTE.SOFT_BROWN)
-      .setStrokeStyle(2, CONFIG.PALETTE.CREAM);
+      .rectangle(this.laneCenters[laneIndex], -height, width, height, THEME.TOKENS.trafficBody)
+      .setStrokeStyle(2, THEME.TOKENS.trafficOutline);
 
     this.vehicles.push(vehicle);
     this.vehicleSpeeds.push(Math.max(0.8, speed));
@@ -195,8 +196,8 @@ export class TrafficSpawner {
     spec: { width: number; height: number; speed: number }
   ): void {
     const vehicle = this.scene.add
-      .rectangle(this.laneCenters[laneIndex], -spec.height, spec.width, spec.height, CONFIG.PALETTE.SOFT_BROWN)
-      .setStrokeStyle(2, CONFIG.PALETTE.CREAM);
+      .rectangle(this.laneCenters[laneIndex], -spec.height, spec.width, spec.height, THEME.TOKENS.trafficBody)
+      .setStrokeStyle(2, THEME.TOKENS.trafficOutline);
 
     this.vehicles.push(vehicle);
     this.vehicleSpeeds.push(Math.max(0.8, spec.speed));

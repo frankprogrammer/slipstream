@@ -1,4 +1,4 @@
-import { CONFIG } from '../config';
+import { THEME } from '../skins/theme';
 
 /**
  * ShareCard — Generates a shareable end-of-run image.
@@ -26,15 +26,15 @@ export class ShareCard {
     }
 
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#D4762C');
-    gradient.addColorStop(1, '#5C4B7A');
+    gradient.addColorStop(0, THEME.TOKENS.shareGradientStartHex);
+    gradient.addColorStop(1, THEME.TOKENS.shareGradientEndHex);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = '#4A3F35';
+    ctx.fillStyle = THEME.TOKENS.sharePanelHex;
     ctx.fillRect(120, 180, 480, 920);
 
-    ctx.fillStyle = '#FFF8F0';
+    ctx.fillStyle = THEME.TOKENS.shareTextHex;
     ctx.textAlign = 'center';
     ctx.font = 'bold 64px system-ui';
     ctx.fillText('SLIPSTREAM', width / 2, 280);
@@ -50,7 +50,7 @@ export class ShareCard {
     ctx.fillText(`DISTANCE ${Math.floor(data.distance)}`, width / 2, 720);
 
     ctx.font = '32px system-ui';
-    ctx.fillStyle = '#E8956A';
+    ctx.fillStyle = THEME.TOKENS.shareAccentHex;
     ctx.fillText('cozy nostalgia run', width / 2, 980);
 
     return canvas.toDataURL('image/png');

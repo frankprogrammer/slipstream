@@ -84,16 +84,8 @@ export const CONFIG = {
   DISTANCE_SCORE_INTERVAL: 10, // every N pixels = 1 point
 
   // ── Visual Juice ──
-  SKY_GRADIENT_COLORS: [
-    "#D4762C",
-    "#E8956A",
-    "#D4836A",
-    "#9B6B8A",
-    "#5C4B7A",
-  ] as readonly string[],
   SKY_TRANSITION_DISTANCE: 5000, // pixels of distance per color step
   SCREEN_FLASH_DURATION: 100, // ms (gold flash at ×10)
-  SCREEN_FLASH_COLOR: 0xf5a623,
   CHAIN_POP_SCALE: 1.3,
   CHAIN_POP_DURATION: 200, // ms
 
@@ -103,7 +95,6 @@ export const CONFIG = {
   SPEED_LINES_FREQUENCY: 50, // ms between particles
 
   // ── Draft Glow ──
-  DRAFT_GLOW_COLOR: 0xf5a623, // amber
   DRAFT_GLOW_PULSE_SPEED: 800, // ms per pulse cycle
 
   // ── Player ──
@@ -113,15 +104,4 @@ export const CONFIG = {
   SWIPE_THRESHOLD: 30, // minimum pixels for swipe detection
   SWIPE_MAX_TIME: 300, // max ms for a swipe gesture
 
-  // ── Art Direction (Cozy Nostalgia Palette) ──
-  PALETTE: {
-    AMBER: 0xd4762c,
-    PEACH: 0xe8956a,
-    CORAL: 0xd4836a,
-    CREAM: 0xfff8f0,
-    WARM_GRAY: 0x4a3f35,
-    SOFT_BROWN: 0x7a6b5d,
-    DUSTY_ROSE: 0x9b6b8a,
-    TWILIGHT: 0x5c4b7a,
-  },
 } as const;

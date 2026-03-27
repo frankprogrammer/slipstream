@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
+import { THEME } from '../skins/theme';
 
 /**
  * SlipstreamZone — Detects when the player is drafting behind a vehicle.
@@ -148,9 +149,12 @@ export class SlipstreamZone {
     for (const vehicle of vehicles) {
       this.getZoneRect(vehicle, this.zoneRect);
       const isActive = overlapVehicle === vehicle || this.activeVehicle === vehicle;
-      this.debugGraphics.fillStyle(isActive ? CONFIG.PALETTE.AMBER : CONFIG.PALETTE.CREAM, isActive ? 0.25 : 0.15);
+      this.debugGraphics.fillStyle(
+        isActive ? THEME.TOKENS.debugZoneActive : THEME.TOKENS.debugZoneIdle,
+        isActive ? 0.25 : 0.15
+      );
       this.debugGraphics.fillRect(this.zoneRect.x, this.zoneRect.y, this.zoneRect.width, this.zoneRect.height);
-      this.debugGraphics.lineStyle(1, CONFIG.PALETTE.CREAM, 0.6);
+      this.debugGraphics.lineStyle(1, THEME.TOKENS.debugZoneOutline, 0.6);
       this.debugGraphics.strokeRect(this.zoneRect.x, this.zoneRect.y, this.zoneRect.width, this.zoneRect.height);
     }
   }

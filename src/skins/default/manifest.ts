@@ -16,14 +16,26 @@ export const SKIN_MANIFEST = {
 
   // ── Color Palette ──
   palette: {
-    primary: '#D4762C',      // amber
-    secondary: '#E8956A',    // peach
-    accent: '#D4836A',       // coral
-    background: '#FFF8F0',   // cream
-    shadow: '#4A3F35',       // warm gray
+    primary: '#D4762C', // amber
+    secondary: '#E8956A', // peach
+    accent: '#D4836A', // coral
+    background: '#FFF8F0', // cream
+    shadow: '#4A3F35', // warm gray
     text: '#4A3F35',
-    textLight: '#7A6B5D',    // soft brown
+    textLight: '#7A6B5D', // soft brown
+
+    // Explicit runtime aliases for engine/scenes.
+    amber: '#D4762C',
+    peach: '#E8956A',
+    coral: '#D4836A',
+    cream: '#FFF8F0',
+    warmGray: '#4A3F35',
+    softBrown: '#7A6B5D',
+    dustyRose: '#9B6B8A',
+    twilight: '#5C4B7A',
   },
+
+  skyGradient: ['#D4762C', '#E8956A', '#D4836A', '#9B6B8A', '#5C4B7A'],
 
   // ── Sprite Assets ──
   // For prototype: use null (engine draws placeholder rectangles)
