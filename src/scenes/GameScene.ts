@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
+import { LaneSystem } from '../engine/LaneSystem';
 import { TrafficSpawner } from '../engine/TrafficSpawner';
 
 /**
@@ -23,11 +24,9 @@ import { TrafficSpawner } from '../engine/TrafficSpawner';
  */
 export class GameScene extends Phaser.Scene {
   private laneCenters: number[] = [];
-  private currentLane = 1;
-  private isSwitchingLane = false;
 
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private player!: Phaser.GameObjects.Rectangle;
+  private laneSystem!: LaneSystem;
   private trafficSpawner!: TrafficSpawner;
 
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
@@ -36,9 +35,6 @@ export class GameScene extends Phaser.Scene {
   private roadWidth = 0;
   private readonly dashLength = 36;
   private readonly dashGap = 28;
-  private swipeStartX = 0;
-  private swipeStartY = 0;
-  private swipeStartTime = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -66,17 +62,18 @@ export class GameScene extends Phaser.Scene {
 
     this.createLaneDashes(height);
     this.createPlayer(height);
+    this.laneSystem = new LaneSystem(this, this.player, this.laneCenters);
     this.trafficSpawner = new TrafficSpawner(this, this.laneCenters);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.trafficSpawner.destroy());
-
-    this.cursors = this.input.keyboard?.createCursorKeys() as Phaser.Types.Input.Keyboard.CursorKeys;
-    this.registerSwipeInput();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.laneSystem.destroy();
+      this.trafficSpawner.destroy();
+    });
   }
 
   update(time: number, delta: number): void {
     void time;
 
-    this.handleLaneInput();
+    this.laneSystem.update();
     this.scrollRoad(delta);
     this.trafficSpawner.update(delta);
   }
@@ -95,78 +92,16 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayer(height: number): void {
     const playerY = height * CONFIG.PLAYER_Y_POSITION;
+    const startLane = Math.floor(CONFIG.LANE_COUNT / 2);
     this.player = this.add
       .rectangle(
-        this.laneCenters[this.currentLane],
+        this.laneCenters[startLane],
         playerY,
         CONFIG.LANE_WIDTH * 0.45,
         72,
         CONFIG.PALETTE.CORAL
       )
       .setStrokeStyle(3, CONFIG.PALETTE.CREAM);
-  }
-
-  private handleLaneInput(): void {
-    if (this.isSwitchingLane) {
-      return;
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.left!)) {
-      this.switchToLane(this.currentLane - 1);
-    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right!)) {
-      this.switchToLane(this.currentLane + 1);
-    }
-  }
-
-  private registerSwipeInput(): void {
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.swipeStartX = pointer.x;
-      this.swipeStartY = pointer.y;
-      this.swipeStartTime = this.time.now;
-    });
-
-    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      const elapsed = this.time.now - this.swipeStartTime;
-      if (elapsed > CONFIG.SWIPE_MAX_TIME) {
-        return;
-      }
-
-      const deltaX = pointer.x - this.swipeStartX;
-      const deltaY = pointer.y - this.swipeStartY;
-      const absX = Math.abs(deltaX);
-      const absY = Math.abs(deltaY);
-
-      // Horizontal intent only: ignore taps and mostly-vertical gestures.
-      if (absX < CONFIG.SWIPE_THRESHOLD || absX <= absY) {
-        return;
-      }
-
-      if (deltaX > 0) {
-        this.switchToLane(this.currentLane + 1);
-      } else {
-        this.switchToLane(this.currentLane - 1);
-      }
-    });
-  }
-
-  private switchToLane(nextLane: number): void {
-    const clampedLane = Phaser.Math.Clamp(nextLane, 0, CONFIG.LANE_COUNT - 1);
-    if (clampedLane === this.currentLane) {
-      return;
-    }
-
-    this.currentLane = clampedLane;
-    this.isSwitchingLane = true;
-
-    this.tweens.add({
-      targets: this.player,
-      x: this.laneCenters[clampedLane],
-      duration: CONFIG.LANE_SWITCH_DURATION,
-      ease: CONFIG.LANE_SWITCH_EASE,
-      onComplete: () => {
-        this.isSwitchingLane = false;
-      },
-    });
   }
 
   private scrollRoad(delta: number): void {
