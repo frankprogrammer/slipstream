@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { CONFIG } from '../config';
 
 /**
  * CollisionSystem — Player vs vehicle collision detection.
@@ -43,6 +42,9 @@ export class CollisionSystem {
     }
 
     this.player.getBounds(this.playerBounds);
+    const verticalTrim = this.playerBounds.height * 0.1;
+    this.playerBounds.y += verticalTrim;
+    this.playerBounds.height -= verticalTrim * 2;
     for (const vehicle of this.getTrafficVehicles()) {
       vehicle.getBounds(this.vehicleBounds);
       if (!Phaser.Geom.Intersects.RectangleToRectangle(this.playerBounds, this.vehicleBounds)) {

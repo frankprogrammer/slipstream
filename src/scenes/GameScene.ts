@@ -95,7 +95,7 @@ export class GameScene extends Phaser.Scene {
     this.createChainText();
     this.createPerfectText();
     this.laneSystem = new LaneSystem(this, this.player, this.laneCenters);
-    this.trafficSpawner = new TrafficSpawner(this, this.laneCenters);
+    this.trafficSpawner = new TrafficSpawner(this, this.laneCenters, this.player.height);
     this.chainManager = new ChainManager(this);
     this.scoreManager = new ScoreManager(this);
     this.slipstreamZone = new SlipstreamZone(

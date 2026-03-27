@@ -27,6 +27,7 @@ import { CONFIG, TrafficPhase } from '../config';
 export class TrafficSpawner {
   private readonly scene: Phaser.Scene;
   private readonly laneCenters: number[];
+  private readonly playerHeight: number;
   private vehicles: Phaser.GameObjects.Rectangle[] = [];
   private vehicleSpeeds: number[] = [];
   private spawnAccumulatorMs = 0;
@@ -36,9 +37,10 @@ export class TrafficSpawner {
   private readonly playerSafetyWindowPx = 220;
   private readonly maxActiveVehicles = 12;
 
-  constructor(scene: Phaser.Scene, laneCenters: number[]) {
+  constructor(scene: Phaser.Scene, laneCenters: number[], playerHeight: number) {
     this.scene = scene;
     this.laneCenters = laneCenters;
+    this.playerHeight = playerHeight;
   }
 
   update(delta: number): void {
@@ -150,6 +152,13 @@ export class TrafficSpawner {
         return false;
       }
 
+      // Ensure lane switching is always possible: do not allow vehicles in adjacent lanes
+      // to be vertically aligned closer than the configured minimum gap.
+      const minAdjacentLaneGap = this.playerHeight * CONFIG.TRAFFIC_ADJACENT_LANE_MIN_GAP_MULTIPLIER;
+      if (Math.abs(vehicleLane - laneIndex) === 1 && Math.abs(vehicle.y - spawnY) < minAdjacentLaneGap) {
+        return false;
+      }
+
       if (Math.abs(vehicle.y - playerY) <= this.playerSafetyWindowPx) {
         nearPlayerBlockedLanes.add(vehicleLane);
       }
@@ -196,9 +205,9 @@ export class TrafficSpawner {
   private createSpawnSpec(phase: TrafficPhase): { width: number; height: number; speed: number } {
     const width = CONFIG.LANE_WIDTH * Phaser.Math.FloatBetween(0.5, 0.68);
     const height = Phaser.Math.Between(70, 95);
-    const variance = Phaser.Math.FloatBetween(-phase.speedVariance, phase.speedVariance);
-    // Keep vehicles slower than the road pace so the player can settle into draft zones.
-    const speed = CONFIG.VEHICLE_BASE_SPEED * (1 + variance);
+    // Important: keep vehicle speeds consistent so adjacency spacing stays valid over time.
+    // If vehicles have different speeds, they can drift into "no lane change" alignments later.
+    const speed = CONFIG.VEHICLE_BASE_SPEED;
     return { width, height, speed };
   }
 
