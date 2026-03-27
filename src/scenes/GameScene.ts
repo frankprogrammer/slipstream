@@ -214,6 +214,7 @@ export class GameScene extends Phaser.Scene {
         THEME.TOKENS.playerBody,
       )
       .setDepth(10)
+      .setAlpha(1)
       .setStrokeStyle(3, THEME.TOKENS.playerOutline);
   }
 

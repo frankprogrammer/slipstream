@@ -21,6 +21,9 @@ import { THEME } from "../skins/theme";
  * - Amber glow on target vehicle
  * - Draft meter UI element
  * - Audio: tunneled wind + rising tone
+ *
+ * When debugDraw is on: slipstream areas show vertical streaks (same width range as edge speed lines)
+ * in a repeating stripe+gap rhythm per column, scrolling downward and looping — no outer border stroke.
  */
 export class SlipstreamZone {
   private readonly scene: Phaser.Scene;
@@ -46,7 +49,8 @@ export class SlipstreamZone {
     this.player = player;
     this.getTrafficVehicles = getTrafficVehicles;
     if (debugDraw) {
-      this.debugGraphics = this.scene.add.graphics().setDepth(20);
+      // Below trail (9) and player (10) so the car stays fully opaque on top.
+      this.debugGraphics = this.scene.add.graphics().setDepth(8);
     }
   }
 
@@ -165,23 +169,83 @@ export class SlipstreamZone {
       this.getZoneRect(vehicle, this.zoneRect);
       const isActive =
         overlapVehicle === vehicle || this.activeVehicle === vehicle;
-      this.debugGraphics.fillStyle(
-        isActive ? THEME.TOKENS.debugZoneActive : THEME.TOKENS.debugZoneIdle,
-        isActive ? 0.25 : 0.15,
-      );
-      this.debugGraphics.fillRect(
-        this.zoneRect.x,
-        this.zoneRect.y,
-        this.zoneRect.width,
-        this.zoneRect.height,
-      );
-      this.debugGraphics.lineStyle(1, THEME.TOKENS.debugZoneOutline, 0.6);
-      this.debugGraphics.strokeRect(
-        this.zoneRect.x,
-        this.zoneRect.y,
-        this.zoneRect.width,
-        this.zoneRect.height,
-      );
+      const fillColor = isActive
+        ? THEME.TOKENS.debugZoneActive
+        : THEME.TOKENS.debugZoneIdle;
+      // Per-streak alpha (many streaks stack visually; same active/idle contrast as before).
+      const streakAlpha = isActive ? 0.22 : 0.12;
+      this.drawSpeedLineStyleStripesInZone(this.zoneRect, fillColor, streakAlpha);
+    }
+  }
+
+  /**
+   * Vertical streaks (edge speed line width) scrolling downward, clipped to `zone`.
+   * Each column tiles a fixed segment list (variable brick heights); world offset scrolls top → bottom.
+   */
+  private drawSpeedLineStyleStripesInZone(
+    zone: Phaser.Geom.Rectangle,
+    fillColor: number,
+    streakAlpha: number,
+  ): void {
+    const g = this.debugGraphics!;
+    const wMin = CONFIG.SPEED_LINES_WIDTH_MIN;
+    const wMax = CONFIG.SPEED_LINES_WIDTH_MAX;
+    const columnStep = 9;
+    const presets = CONFIG.SLIPSTREAM_DEBUG_STREAK_COLUMN_PRESETS;
+    const zoneLeft = Math.round(zone.x);
+    const zoneRight = Math.round(zone.x + zone.width);
+    const zoneTop = Math.round(zone.y);
+    const zoneBottom = Math.round(zone.y + zone.height);
+    const zoneH = zoneBottom - zoneTop;
+
+    const scrollInt = Math.floor(
+      (this.scene.time.now / 1000) * CONFIG.SLIPSTREAM_DEBUG_STREAK_SCROLL_SPEED,
+    );
+
+    let col = 0;
+    for (let px = zoneLeft + 1; px + wMin < zoneRight - 1; px += columnStep) {
+      const pxI = Math.round(px);
+      const rw =
+        wMin +
+        ((col * 3 + Math.floor(zone.x * 0.1) + Math.floor(zone.y)) %
+          (wMax - wMin + 1));
+
+      const preset = presets[col % presets.length]!;
+      const norm = preset.segments.map((s) => ({
+        brick: Math.max(1, Math.round(s.brick)),
+        gap: Math.max(0, Math.round(s.gap)),
+      }));
+      let period = 0;
+      for (const n of norm) {
+        period += n.brick + n.gap;
+      }
+      period = Math.max(1, period);
+
+      const phase =
+        ((col * 17 + Math.floor(zone.x) * 3) % period + period) % period;
+      const scrollOffset = scrollInt + phase;
+
+      const pad = period * 4;
+      const rMin = Math.floor((scrollOffset - pad) / period) - 2;
+      const rMax = Math.ceil((scrollOffset + zoneH + pad) / period) + 2;
+
+      for (let r = rMin; r <= rMax; r += 1) {
+        let acc = 0;
+        for (const seg of norm) {
+          const w0 = r * period + acc;
+          const dTop = scrollOffset - w0;
+          const yTop = zoneTop + dTop;
+          const yBot = yTop + seg.brick;
+          const drawTop = Math.max(zoneTop, Math.round(yTop));
+          const drawBottom = Math.min(zoneBottom, Math.round(yBot));
+          if (drawBottom > drawTop) {
+            g.fillStyle(fillColor, streakAlpha);
+            g.fillRect(pxI, drawTop, rw, drawBottom - drawTop);
+          }
+          acc += seg.brick + seg.gap;
+        }
+      }
+      col += 1;
     }
   }
 }

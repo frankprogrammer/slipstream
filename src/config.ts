@@ -34,6 +34,43 @@ export const CONFIG = {
   // ── Slipstream ──
   SLIPSTREAM_ZONE_WIDTH: 80, // pixels wide (centered behind vehicle)
   SLIPSTREAM_ZONE_DEPTH: 120, // pixels below vehicle
+  /** Debug slipstream streaks: vertical scroll speed (px/s) inside the zone rect. */
+  SLIPSTREAM_DEBUG_STREAK_SCROLL_SPEED: 90,
+  /**
+   * Each column tiles one repeating sequence: brick → gap → brick → … (variable brick heights OK).
+   * Presets cycle by column index; same sequence every loop (deterministic, not noisy).
+   */
+  SLIPSTREAM_DEBUG_STREAK_COLUMN_PRESETS: [
+    {
+      segments: [
+        { brick: 10, gap: 5 },
+        { brick: 18, gap: 5 },
+        { brick: 7, gap: 6 },
+      ],
+    },
+    {
+      segments: [
+        { brick: 22, gap: 4 },
+        { brick: 12, gap: 4 },
+        { brick: 16, gap: 5 },
+      ],
+    },
+    {
+      segments: [
+        { brick: 8, gap: 6 },
+        { brick: 14, gap: 5 },
+        { brick: 11, gap: 7 },
+        { brick: 6, gap: 6 },
+      ],
+    },
+    {
+      segments: [
+        { brick: 16, gap: 5 },
+        { brick: 9, gap: 6 },
+        { brick: 20, gap: 4 },
+      ],
+    },
+  ] as const,
   /**
    * Draft meter fill per frame at BASE_SCROLL_SPEED (× delta normalization).
    * Actual fill is multiplied by (current scroll step / base scroll step) so faster runs keep similar draft timing.
