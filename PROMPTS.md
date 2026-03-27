@@ -6,7 +6,13 @@ This file records **user prompts** for this project (the exact text sent in chat
 
 ## How to maintain “all future prompts”
 
-Cursor does not auto-append to this file. After meaningful exchanges, add new entries under **Future prompts** (or ask the assistant: “Append my last prompt to PROMPTS.md”).
+Cursor **does not** have a built-in setting to append to a file on every message you send. Practical options:
+
+1. **Ask in chat** — e.g. “Append my last prompt to PROMPTS.md” or “Log this thread’s prompts to PROMPTS.md.”
+2. **Project rule (recommended)** — Add a short rule under `.cursor/rules/` (or `CLAUDE.md` / `AGENTS.md`) such as: *When the user’s request is completed, append their exact user message as a new numbered entry at the end of `PROMPTS.md` (newest last), unless they opt out.* The AI will follow it when it applies; it is not a guaranteed OS-level hook, but it works well if you keep the rule enabled.
+3. **Manual** — Paste or type new prompts under **Future prompts** yourself.
+
+There is no reliable way to intercept **every** IDE message from outside Cursor (no official “on prompt” API for repo files). A git pre-commit hook only sees commits, not chat.
 
 ---
 
@@ -306,6 +312,34 @@ Okay, let's change this up again. The mouse down to the left and right of the pl
 
 also please keep updating my prompts.md
 
+### 74
+
+This is better, but the line heights should be more random between columns. And right now they seem to jitter. They seem to vibrate up and down a little bit as they are scrolling down.
+
+### 75
+
+The slipstream almost seems like a random noise now. I need it to be consistent as if the pieces are spawning. Let's say in a specific column it spawns and being 10 pixels high, and then there's a gap of 20 pixels, and then the next column is 20 pixels high, and then a gap of five pixels, and then those move up and loop around consistently without jittering.
+
+### 76
+
+This is better, but it looks like the streams are scrolling from bottom to top. They need to scroll from top to bottom. Additionally, there is a little bit too much empty space between the chunks vertically. Let's cut that down.
+
+### 77
+
+Can we make it so that within a column, the different Bricks have variable lengths within them.
+
+### 78
+
+Right now it feels like when you enter the slipstream, it speeds up but then slows down for a second. the game should never slow down. It should always just be getting faster and faster and faster.
+
+### 79
+
+So that when you enter a slipstream, the camera zooms in a little bit. And then right as you exit the slipstream, it quickly zooms out.
+
+### 80
+
+Can you update my prompts.md file? And also, is it still possible to update it automatically every time I make a new prompt?
+
 ---
 
 ## Lane input — current behavior (`src/engine/LaneSystem.ts`)
@@ -319,4 +353,4 @@ also please keep updating my prompts.md
 
 ## Future prompts
 
-_Add new prompts below as you go (newest at the bottom)._
+_Add new prompts below as you go (newest at the bottom), or ask the assistant to append after a session._

@@ -1,0 +1,12 @@
+---
+description: Update PROMPTS.md when the user wants prompts logged
+alwaysApply: true
+---
+
+# PROMPTS.md
+
+When the user asks to **update**, **append to**, or **log prompts in** `PROMPTS.md`, add their message(s) as new numbered `### N` entries under **Historical prompts** in `PROMPTS.md` (continue numbering from the highest existing prompt), preserving exact wording.
+
+Do not append on every reply by default—only when they ask, or when they use phrases like “log this prompt” / “add to prompts file.”
+
+For “automatic every prompt”: Cursor has no native auto-append; see the “How to maintain” section in `PROMPTS.md`.
