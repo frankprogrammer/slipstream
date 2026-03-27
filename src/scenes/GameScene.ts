@@ -45,6 +45,7 @@ export class GameScene extends Phaser.Scene {
   private draftMeterBg!: Phaser.GameObjects.Rectangle;
   private draftMeterFill!: Phaser.GameObjects.Rectangle;
   private chainText!: Phaser.GameObjects.Text;
+  private perfectText!: Phaser.GameObjects.Text;
   private flashOverlay!: Phaser.GameObjects.Rectangle;
 
   private roadLeft = 0;
@@ -57,6 +58,7 @@ export class GameScene extends Phaser.Scene {
   private activeDraftVehicle: Phaser.GameObjects.Rectangle | null = null;
   private draftGlowTween: Phaser.Tweens.Tween | null = null;
   private speedLineSpawnAccumulatorMs = 0;
+  private currentChain = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -91,6 +93,7 @@ export class GameScene extends Phaser.Scene {
     this.createScoreText();
     this.createDraftMeter();
     this.createChainText();
+    this.createPerfectText();
     this.laneSystem = new LaneSystem(this, this.player, this.laneCenters);
     this.trafficSpawner = new TrafficSpawner(this, this.laneCenters);
     this.chainManager = new ChainManager(this);
@@ -223,6 +226,21 @@ export class GameScene extends Phaser.Scene {
       .setVisible(false);
   }
 
+  private createPerfectText(): void {
+    this.perfectText = this.add
+      .text(this.scale.width / 2, this.scale.height * 0.36, 'PERFECT!', {
+        fontFamily: 'Arial',
+        fontSize: '58px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5)
+      .setDepth(41)
+      .setAlpha(0)
+      .setScale(0.8)
+      .setVisible(false)
+      .setShadow(0, 2, '#4A3F35', 4, false, true);
+  }
+
   private updateDraftMeterUI(): void {
     const meterWidth = this.draftMeterBg.width;
     const meterY = this.player.y - 62;
@@ -272,6 +290,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleChainChanged(chain: number): void {
+    this.currentChain = chain;
     this.chainText.setText(`x${chain}`);
     this.chainText.setScale(CONFIG.CHAIN_POP_SCALE);
     this.tweens.add({
@@ -291,10 +310,15 @@ export class GameScene extends Phaser.Scene {
     this.isDraftFxActive = true;
     this.activeDraftVehicle = vehicle;
     vehicle.setStrokeStyle(4, CONFIG.DRAFT_GLOW_COLOR);
+    const glowPulseMs = Phaser.Math.Clamp(
+      CONFIG.DRAFT_GLOW_PULSE_SPEED - chainIntensityFor(this.currentChain) * 350,
+      260,
+      CONFIG.DRAFT_GLOW_PULSE_SPEED
+    );
     this.draftGlowTween = this.tweens.add({
       targets: vehicle,
       alpha: 0.7,
-      duration: CONFIG.DRAFT_GLOW_PULSE_SPEED / 2,
+      duration: glowPulseMs / 2,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.InOut',
@@ -325,7 +349,8 @@ export class GameScene extends Phaser.Scene {
 
   private updateSpeedLines(delta: number): void {
     const speedScale = delta / (1000 / 60);
-    const speedLineVelocity = 12 * speedScale;
+    const intensity = chainIntensityFor(this.currentChain);
+    const speedLineVelocity = (12 + intensity * 7) * speedScale;
 
     for (let i = this.speedLines.length - 1; i >= 0; i -= 1) {
       const line = this.speedLines[i];
@@ -342,13 +367,19 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.speedLineSpawnAccumulatorMs += delta;
-    while (this.speedLineSpawnAccumulatorMs >= CONFIG.SPEED_LINES_FREQUENCY) {
-      this.speedLineSpawnAccumulatorMs -= CONFIG.SPEED_LINES_FREQUENCY;
+    const targetFrequency = Phaser.Math.Clamp(
+      CONFIG.SPEED_LINES_FREQUENCY - intensity * 28,
+      20,
+      CONFIG.SPEED_LINES_FREQUENCY
+    );
+    while (this.speedLineSpawnAccumulatorMs >= targetFrequency) {
+      this.speedLineSpawnAccumulatorMs -= targetFrequency;
       this.spawnSpeedLine();
     }
   }
 
   private spawnSpeedLine(): void {
+    const intensity = chainIntensityFor(this.currentChain);
     const fromLeft = Math.random() < 0.5;
     const x = fromLeft
       ? Phaser.Math.Between(6, Math.max(8, this.roadLeft - 4))
@@ -360,7 +391,13 @@ export class GameScene extends Phaser.Scene {
     const line = this.add
       .rectangle(x, y, Phaser.Math.Between(2, 4), Phaser.Math.Between(18, 34), CONFIG.PALETTE.CREAM)
       .setDepth(14)
-      .setAlpha(CONFIG.SPEED_LINES_BASE_ALPHA);
+      .setAlpha(
+        Phaser.Math.Clamp(
+          CONFIG.SPEED_LINES_BASE_ALPHA + intensity * 0.35,
+          CONFIG.SPEED_LINES_BASE_ALPHA,
+          CONFIG.SPEED_LINES_MAX_ALPHA
+        )
+      );
     this.speedLines.push(line);
   }
 
@@ -380,6 +417,20 @@ export class GameScene extends Phaser.Scene {
         this.flashOverlay.setVisible(false);
       },
     });
+
+    this.tweens.killTweensOf(this.perfectText);
+    this.perfectText.setVisible(true).setAlpha(1).setScale(0.84).setY(this.scale.height * 0.38);
+    this.tweens.add({
+      targets: this.perfectText,
+      y: this.scale.height * 0.33,
+      scale: 1,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Cubic.Out',
+      onComplete: () => {
+        this.perfectText.setVisible(false);
+      },
+    });
   }
 
   private updateSkyGradient(): void {
@@ -392,9 +443,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     const phase = distance / segmentLength;
-    const fromIndex = Phaser.Math.Clamp(Math.floor(phase) % colorCount, 0, colorCount - 1);
-    const toIndex = Math.min(fromIndex + 1, colorCount - 1);
-    const t = Phaser.Math.Clamp(phase - Math.floor(phase), 0, 1);
+    const wrappedPhase = ((phase % colorCount) + colorCount) % colorCount;
+    const fromIndex = Math.floor(wrappedPhase);
+    const toIndex = (fromIndex + 1) % colorCount;
+    const t = wrappedPhase - fromIndex;
 
     const from = Phaser.Display.Color.HexStringToColor(CONFIG.SKY_GRADIENT_COLORS[fromIndex]);
     const to = Phaser.Display.Color.HexStringToColor(CONFIG.SKY_GRADIENT_COLORS[toIndex]);
@@ -423,5 +475,10 @@ export class GameScene extends Phaser.Scene {
     this.isDraftFxActive = false;
     this.activeDraftVehicle = null;
     this.speedLineSpawnAccumulatorMs = 0;
+    this.currentChain = 0;
   }
+}
+
+function chainIntensityFor(chain: number): number {
+  return Phaser.Math.Clamp(chain / 12, 0, 1);
 }

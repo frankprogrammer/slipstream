@@ -31,6 +31,8 @@ export class TrafficSpawner {
   private vehicleSpeeds: number[] = [];
   private spawnAccumulatorMs = 0;
   private elapsedMs = 0;
+  private readonly spawnLaneGap = 140;
+  private readonly wallAvoidanceTimeWindowMs = 650;
 
   constructor(scene: Phaser.Scene, laneCenters: number[]) {
     this.scene = scene;
@@ -43,8 +45,13 @@ export class TrafficSpawner {
 
     const phase = this.getCurrentPhase();
     while (this.spawnAccumulatorMs >= phase.spawnRate) {
+      if (!this.trySpawnVehicle(phase)) {
+        // Lane is temporarily saturated (common in warm-up center-lane phase).
+        // Retry soon instead of forcing overlapping spawns.
+        this.spawnAccumulatorMs = phase.spawnRate;
+        break;
+      }
       this.spawnAccumulatorMs -= phase.spawnRate;
-      this.spawnVehicle(phase);
     }
 
     const speedScale = delta / (1000 / 60);
@@ -90,13 +97,111 @@ export class TrafficSpawner {
     const height = Phaser.Math.Between(70, 95);
 
     const variance = Phaser.Math.FloatBetween(-phase.speedVariance, phase.speedVariance);
-    const speed = (CONFIG.VEHICLE_BASE_SPEED + CONFIG.BASE_SCROLL_SPEED) * (1 + variance);
+    // Keep vehicles slower than the road pace so the player can settle into draft zones.
+    const speed = CONFIG.VEHICLE_BASE_SPEED * (1 + variance);
 
     const vehicle = this.scene.add
       .rectangle(this.laneCenters[laneIndex], -height, width, height, CONFIG.PALETTE.SOFT_BROWN)
       .setStrokeStyle(2, CONFIG.PALETTE.CREAM);
 
     this.vehicles.push(vehicle);
-    this.vehicleSpeeds.push(Math.max(1.2, speed));
+    this.vehicleSpeeds.push(Math.max(0.8, speed));
+  }
+
+  private trySpawnVehicle(phase: TrafficPhase): boolean {
+    // Use all lanes for now to keep early gameplay varied.
+    const candidateLanes = this.laneCenters.map((_, index) => index);
+    Phaser.Utils.Array.Shuffle(candidateLanes);
+    const spawnSpec = this.createSpawnSpec(phase);
+
+    for (const laneIndex of candidateLanes) {
+      if (!this.canSpawnInLane(laneIndex, spawnSpec.speed, spawnSpec.height)) {
+        continue;
+      }
+      this.spawnVehicleInLane(laneIndex, spawnSpec);
+      return true;
+    }
+
+    return false;
+  }
+
+  private canSpawnInLane(laneIndex: number, spawnSpeed: number, spawnHeight: number): boolean {
+    const laneX = this.laneCenters[laneIndex];
+    const blockingLanes = new Set<number>();
+    const playerY = this.scene.scale.height * CONFIG.PLAYER_Y_POSITION;
+    const spawnY = -spawnHeight;
+    const spawnEtaMs = ((playerY - spawnY) / Math.max(0.1, spawnSpeed)) * (1000 / 60);
+
+    for (const vehicle of this.vehicles) {
+      const vehicleLane = this.getLaneIndexForX(vehicle.x);
+      if (vehicleLane === -1) {
+        continue;
+      }
+
+      if (vehicleLane === laneIndex && vehicle.y < this.spawnLaneGap) {
+        return false;
+      }
+
+      const vehicleSpeed = this.getVehicleSpeed(vehicle);
+      const vehicleEtaMs = ((playerY - vehicle.y) / Math.max(0.1, vehicleSpeed)) * (1000 / 60);
+      if (vehicleEtaMs < 0) {
+        continue;
+      }
+
+      if (Math.abs(vehicleEtaMs - spawnEtaMs) <= this.wallAvoidanceTimeWindowMs) {
+        blockingLanes.add(vehicleLane);
+      }
+    }
+
+    // Never allow a new spawn that would create a three-lane "wall"
+    // arriving around the player's y-position at the same time window.
+    blockingLanes.add(laneIndex);
+    if (blockingLanes.size >= CONFIG.LANE_COUNT) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private spawnVehicleInLane(
+    laneIndex: number,
+    spec: { width: number; height: number; speed: number }
+  ): void {
+    const vehicle = this.scene.add
+      .rectangle(this.laneCenters[laneIndex], -spec.height, spec.width, spec.height, CONFIG.PALETTE.SOFT_BROWN)
+      .setStrokeStyle(2, CONFIG.PALETTE.CREAM);
+
+    this.vehicles.push(vehicle);
+    this.vehicleSpeeds.push(Math.max(0.8, spec.speed));
+  }
+
+  private createSpawnSpec(phase: TrafficPhase): { width: number; height: number; speed: number } {
+    const width = CONFIG.LANE_WIDTH * Phaser.Math.FloatBetween(0.5, 0.68);
+    const height = Phaser.Math.Between(70, 95);
+    const variance = Phaser.Math.FloatBetween(-phase.speedVariance, phase.speedVariance);
+    // Keep vehicles slower than the road pace so the player can settle into draft zones.
+    const speed = CONFIG.VEHICLE_BASE_SPEED * (1 + variance);
+    return { width, height, speed };
+  }
+
+  private getLaneIndexForX(x: number): number {
+    let bestIndex = -1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < this.laneCenters.length; i += 1) {
+      const distance = Math.abs(x - this.laneCenters[i]);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+    return bestDistance <= CONFIG.LANE_WIDTH * 0.45 ? bestIndex : -1;
+  }
+
+  private getVehicleSpeed(vehicle: Phaser.GameObjects.Rectangle): number {
+    const idx = this.vehicles.indexOf(vehicle);
+    if (idx < 0) {
+      return CONFIG.VEHICLE_BASE_SPEED;
+    }
+    return this.vehicleSpeeds[idx];
   }
 }
