@@ -31,8 +31,10 @@ export class TrafficSpawner {
   private vehicleSpeeds: number[] = [];
   private spawnAccumulatorMs = 0;
   private elapsedMs = 0;
-  private readonly spawnLaneGap = 140;
-  private readonly wallAvoidanceTimeWindowMs = 650;
+  private readonly spawnLaneGap = 165;
+  private readonly wallAvoidanceTimeWindowMs = 900;
+  private readonly playerSafetyWindowPx = 220;
+  private readonly maxActiveVehicles = 12;
 
   constructor(scene: Phaser.Scene, laneCenters: number[]) {
     this.scene = scene;
@@ -45,6 +47,11 @@ export class TrafficSpawner {
 
     const phase = this.getCurrentPhase();
     while (this.spawnAccumulatorMs >= phase.spawnRate) {
+      if (this.vehicles.length >= this.maxActiveVehicles) {
+        this.spawnAccumulatorMs = phase.spawnRate;
+        break;
+      }
+
       if (!this.trySpawnVehicle(phase)) {
         // Lane is temporarily saturated (common in warm-up center-lane phase).
         // Retry soon instead of forcing overlapping spawns.
@@ -127,7 +134,8 @@ export class TrafficSpawner {
 
   private canSpawnInLane(laneIndex: number, spawnSpeed: number, spawnHeight: number): boolean {
     const laneX = this.laneCenters[laneIndex];
-    const blockingLanes = new Set<number>();
+    const wallBlockingLanes = new Set<number>();
+    const nearPlayerBlockedLanes = new Set<number>();
     const playerY = this.scene.scale.height * CONFIG.PLAYER_Y_POSITION;
     const spawnY = -spawnHeight;
     const spawnEtaMs = ((playerY - spawnY) / Math.max(0.1, spawnSpeed)) * (1000 / 60);
@@ -142,6 +150,10 @@ export class TrafficSpawner {
         return false;
       }
 
+      if (Math.abs(vehicle.y - playerY) <= this.playerSafetyWindowPx) {
+        nearPlayerBlockedLanes.add(vehicleLane);
+      }
+
       const vehicleSpeed = this.getVehicleSpeed(vehicle);
       const vehicleEtaMs = ((playerY - vehicle.y) / Math.max(0.1, vehicleSpeed)) * (1000 / 60);
       if (vehicleEtaMs < 0) {
@@ -149,14 +161,20 @@ export class TrafficSpawner {
       }
 
       if (Math.abs(vehicleEtaMs - spawnEtaMs) <= this.wallAvoidanceTimeWindowMs) {
-        blockingLanes.add(vehicleLane);
+        wallBlockingLanes.add(vehicleLane);
       }
     }
 
     // Never allow a new spawn that would create a three-lane "wall"
     // arriving around the player's y-position at the same time window.
-    blockingLanes.add(laneIndex);
-    if (blockingLanes.size >= CONFIG.LANE_COUNT) {
+    wallBlockingLanes.add(laneIndex);
+    if (wallBlockingLanes.size >= CONFIG.LANE_COUNT) {
+      return false;
+    }
+
+    // Also keep at least one lane open in the immediate player region.
+    nearPlayerBlockedLanes.add(laneIndex);
+    if (nearPlayerBlockedLanes.size >= CONFIG.LANE_COUNT) {
       return false;
     }
 

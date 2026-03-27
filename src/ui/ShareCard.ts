@@ -13,5 +13,57 @@ import { CONFIG } from '../config';
  * Triggered by share button on GameOverScene.
  */
 export class ShareCard {
-  // TODO: Implement
+  generate(data: { score: number; bestChain: number; distance: number }): string {
+    const width = 720;
+    const height = 1280;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      return '';
+    }
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, '#D4762C');
+    gradient.addColorStop(1, '#5C4B7A');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = '#4A3F35';
+    ctx.fillRect(120, 180, 480, 920);
+
+    ctx.fillStyle = '#FFF8F0';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 64px system-ui';
+    ctx.fillText('SLIPSTREAM', width / 2, 280);
+
+    ctx.font = 'bold 140px system-ui';
+    ctx.fillText(`${Math.floor(data.score)}`, width / 2, 460);
+
+    ctx.font = '36px system-ui';
+    ctx.fillText('SCORE', width / 2, 520);
+
+    ctx.font = 'bold 48px system-ui';
+    ctx.fillText(`BEST CHAIN x${Math.floor(data.bestChain)}`, width / 2, 640);
+    ctx.fillText(`DISTANCE ${Math.floor(data.distance)}`, width / 2, 720);
+
+    ctx.font = '32px system-ui';
+    ctx.fillStyle = '#E8956A';
+    ctx.fillText('cozy nostalgia run', width / 2, 980);
+
+    return canvas.toDataURL('image/png');
+  }
+
+  download(data: { score: number; bestChain: number; distance: number }): void {
+    const url = this.generate(data);
+    if (!url) {
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `slipstream-${Date.now()}.png`;
+    link.click();
+  }
 }

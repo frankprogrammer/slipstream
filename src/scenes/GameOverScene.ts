@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
+import { ShareCard } from '../ui/ShareCard';
 
 /**
  * GameOverScene — The single end-of-run screen.
@@ -17,6 +18,7 @@ interface RunData {
 }
 
 export class GameOverScene extends Phaser.Scene {
+  private readonly shareCard = new ShareCard();
   private runData: RunData = {
     score: 0,
     bestChain: 0,
@@ -66,16 +68,22 @@ export class GameOverScene extends Phaser.Scene {
       .setAlpha(0.9);
 
     this.add
-      .text(
-        width / 2,
-        height * 0.47,
-        `BEST CHAIN x${this.runData.bestChain}   |   DIST ${this.runData.distance}`,
-        {
-          fontFamily: 'Arial',
-          fontSize: '20px',
-          color: '#FFF8F0',
-        }
-      )
+      .text(width * 0.3, height * 0.47, `BEST CHAIN\nx${this.runData.bestChain}`, {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        color: '#FFF8F0',
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.95);
+
+    this.add
+      .text(width * 0.7, height * 0.47, `DISTANCE\n${this.runData.distance}`, {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        color: '#FFF8F0',
+        align: 'center',
+      })
       .setOrigin(0.5)
       .setAlpha(0.95);
 
@@ -94,6 +102,23 @@ export class GameOverScene extends Phaser.Scene {
 
     retry.on('pointerdown', () => {
       this.scene.start('GameScene');
+    });
+
+    const share = this.add
+      .rectangle(width / 2, height * 0.72, 200, 56, CONFIG.PALETTE.CORAL)
+      .setStrokeStyle(3, CONFIG.PALETTE.CREAM)
+      .setInteractive({ useHandCursor: true });
+
+    this.add
+      .text(share.x, share.y, 'SHARE', {
+        fontFamily: 'Arial',
+        fontSize: '28px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5);
+
+    share.on('pointerdown', () => {
+      this.shareCard.download(this.runData);
     });
   }
 }

@@ -196,9 +196,9 @@ export class GameScene extends Phaser.Scene {
 
   private createScoreText(): void {
     this.scoreText = this.add
-      .text(this.scale.width / 2, 20, '0', {
+      .text(this.scale.width / 2, 16, '0', {
         fontFamily: 'Arial',
-        fontSize: '42px',
+        fontSize: '40px',
         color: '#FFF8F0',
       })
       .setOrigin(0.5, 0)
@@ -208,12 +208,12 @@ export class GameScene extends Phaser.Scene {
 
   private createChainText(): void {
     this.chainText = this.add
-      .text(this.scale.width / 2, 56, 'x0', {
+      .text(this.scale.width / 2, 86, 'x0', {
         fontFamily: 'Arial',
-        fontSize: '34px',
+        fontSize: '30px',
         color: '#FFF8F0',
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5, 0)
       .setDepth(15)
       .setShadow(0, 2, '#4A3F35', 4, false, true);
   }
