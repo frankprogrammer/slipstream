@@ -5,10 +5,9 @@ import { CONFIG } from '../config';
  * LaneSystem — Manages the 3-lane grid and player lane-switching.
  *
  * Responsibilities:
- * - Track current lane (0=left, 1=center, 2=right)
- * - Convert lane index to X pixel position
- * - Animate lane-switch with tween (CONFIG.LANE_SWITCH_DURATION, CONFIG.LANE_SWITCH_EASE)
- * - Pointer (touch or mouse) on pointerdown: left of player center → left lane, right → right lane
+ * - Touchdown: compare pointer world X to player center — left moves one lane left, right moves one lane right.
+ * - While held: each additional CONFIG.LANE_DRAG_STEP_PX horizontally from the anchor moves one more lane
+ *   in that direction (anchor steps by LANE_DRAG_STEP_PX so multiple 10px chunks can chain across frames).
  * - Arrow keys for desktop testing
  * - Prevent lane-switch during active tween
  */
@@ -21,30 +20,48 @@ export class LaneSystem {
   private currentLane = 1;
   private isSwitchingLane = false;
 
+  /** World X reference for drag-step lane changes after touchdown. */
+  private dragAnchorX = 0;
+
   private readonly onPointerDown: (pointer: Phaser.Input.Pointer) => void;
+  private readonly onPointerMove: (pointer: Phaser.Input.Pointer) => void;
 
   constructor(scene: Phaser.Scene, player: Phaser.GameObjects.Rectangle, laneCenters: number[]) {
     this.scene = scene;
     this.player = player;
     this.laneCenters = laneCenters;
     this.currentLane = Math.floor(laneCenters.length / 2);
+
     this.onPointerDown = (pointer: Phaser.Input.Pointer) => {
-      if (this.isSwitchingLane) {
+      if (pointer.rightButtonDown()) {
+        return;
+      }
+      const px = pointer.worldX;
+      const cx = this.player.x;
+      if (!this.isSwitchingLane) {
+        if (px < cx) {
+          this.switchToLane(this.currentLane - 1);
+        } else if (px > cx) {
+          this.switchToLane(this.currentLane + 1);
+        }
+      }
+      this.dragAnchorX = pointer.worldX;
+    };
+
+    this.onPointerMove = (pointer: Phaser.Input.Pointer) => {
+      if (!pointer.isDown) {
         return;
       }
       if (pointer.rightButtonDown()) {
         return;
       }
-      const px = pointer.worldX;
-      if (px < this.player.x) {
-        this.switchToLane(this.currentLane - 1);
-      } else if (px > this.player.x) {
-        this.switchToLane(this.currentLane + 1);
-      }
+      this.processDragSteps(pointer);
     };
 
-    this.cursors = this.scene.input.keyboard?.createCursorKeys() as Phaser.Types.Input.Keyboard.CursorKeys;
     this.scene.input.on('pointerdown', this.onPointerDown);
+    this.scene.input.on('pointermove', this.onPointerMove);
+
+    this.cursors = this.scene.input.keyboard?.createCursorKeys() as Phaser.Types.Input.Keyboard.CursorKeys;
   }
 
   update(): void {
@@ -66,6 +83,25 @@ export class LaneSystem {
 
   destroy(): void {
     this.scene.input.off('pointerdown', this.onPointerDown);
+    this.scene.input.off('pointermove', this.onPointerMove);
+  }
+
+  private processDragSteps(pointer: Phaser.Input.Pointer): void {
+    if (this.isSwitchingLane) {
+      return;
+    }
+
+    const step = CONFIG.LANE_DRAG_STEP_PX;
+    const px = pointer.worldX;
+    let dx = px - this.dragAnchorX;
+
+    if (dx >= step) {
+      this.switchToLane(this.currentLane + 1);
+      this.dragAnchorX += step;
+    } else if (dx <= -step) {
+      this.switchToLane(this.currentLane - 1);
+      this.dragAnchorX -= step;
+    }
   }
 
   private switchToLane(nextLane: number): void {
