@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { CONFIG } from '../config';
 import { ChainManager } from '../engine/ChainManager';
 import { LaneSystem } from '../engine/LaneSystem';
+import { ScoreManager } from '../engine/ScoreManager';
 import { SlipstreamZone } from '../engine/SlipstreamZone';
 import { TrafficSpawner } from '../engine/TrafficSpawner';
 
@@ -32,8 +33,10 @@ export class GameScene extends Phaser.Scene {
   private trafficSpawner!: TrafficSpawner;
   private slipstreamZone!: SlipstreamZone;
   private chainManager!: ChainManager;
+  private scoreManager!: ScoreManager;
 
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
+  private scoreText!: Phaser.GameObjects.Text;
   private draftMeterBg!: Phaser.GameObjects.Rectangle;
   private draftMeterFill!: Phaser.GameObjects.Rectangle;
   private chainText!: Phaser.GameObjects.Text;
@@ -70,11 +73,13 @@ export class GameScene extends Phaser.Scene {
 
     this.createLaneDashes(height);
     this.createPlayer(height);
+    this.createScoreText();
     this.createDraftMeter();
     this.createChainText();
     this.laneSystem = new LaneSystem(this, this.player, this.laneCenters);
     this.trafficSpawner = new TrafficSpawner(this, this.laneCenters);
     this.chainManager = new ChainManager(this);
+    this.scoreManager = new ScoreManager(this);
     this.slipstreamZone = new SlipstreamZone(
       this,
       this.player,
@@ -83,9 +88,11 @@ export class GameScene extends Phaser.Scene {
     );
     this.events.on('draft-complete', this.handleDraftComplete, this);
     this.events.on('chain-changed', this.handleChainChanged, this);
+    this.events.on('score-changed', this.handleScoreChanged, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off('draft-complete', this.handleDraftComplete, this);
       this.events.off('chain-changed', this.handleChainChanged, this);
+      this.events.off('score-changed', this.handleScoreChanged, this);
       this.laneSystem.destroy();
       this.slipstreamZone.destroy();
       this.trafficSpawner.destroy();
@@ -151,6 +158,18 @@ export class GameScene extends Phaser.Scene {
       .setVisible(false);
   }
 
+  private createScoreText(): void {
+    this.scoreText = this.add
+      .text(this.scale.width / 2, 20, '0', {
+        fontFamily: 'Arial',
+        fontSize: '42px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(15)
+      .setShadow(0, 2, '#4A3F35', 4, false, true);
+  }
+
   private createChainText(): void {
     this.chainText = this.add
       .text(this.scale.width / 2, 56, 'x0', {
@@ -184,6 +203,7 @@ export class GameScene extends Phaser.Scene {
     this.burstRemainingMs = Math.max(0, this.burstRemainingMs - delta);
     const burstSpeed = this.burstRemainingMs > 0 ? CONFIG.SLINGSHOT_SPEED_BURST : 0;
     const scrollStep = (CONFIG.BASE_SCROLL_SPEED + burstSpeed) * speedScale;
+    this.scoreManager.addDistance(scrollStep);
     const wrapY = this.scale.height + this.dashLength;
 
     for (const dash of this.roadDashes) {
@@ -195,7 +215,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleDraftComplete(): void {
-    this.chainManager.completeDraft();
+    const chain = this.chainManager.completeDraft();
+    this.scoreManager.addDraftCompleteBonus(chain);
     this.burstRemainingMs = CONFIG.SLINGSHOT_BURST_DURATION;
 
     this.tweens.add({
@@ -217,5 +238,9 @@ export class GameScene extends Phaser.Scene {
       duration: CONFIG.CHAIN_POP_DURATION,
       ease: 'Back.easeOut',
     });
+  }
+
+  private handleScoreChanged(score: number): void {
+    this.scoreText.setText(`${Math.floor(score)}`);
   }
 }
