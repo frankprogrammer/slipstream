@@ -24,8 +24,6 @@ export const CONFIG = {
   LANE_WIDTH: 100, // pixels per lane
   LANE_SWITCH_DURATION: 150, // ms for lane-switch tween
   LANE_SWITCH_EASE: "Back.easeOut", // slight overshoot for satisfying snap
-  /** After touchdown (or each lane change from drag), horizontal drag this many px triggers another lane step. */
-  LANE_DRAG_STEP_PX: 40,
 
   // ── Scrolling ──
   BASE_SCROLL_SPEED: 4.25, // pixels per frame at start

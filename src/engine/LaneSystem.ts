@@ -6,10 +6,8 @@ import { CONFIG } from '../config';
  *
  * Responsibilities:
  * - Touchdown: compare pointer world X to player center — left moves one lane left, right moves one lane right.
- * - While held: each additional CONFIG.LANE_DRAG_STEP_PX horizontally from the anchor moves one more lane
- *   in that direction (anchor steps by LANE_DRAG_STEP_PX so multiple 10px chunks can chain across frames).
+ * - While held (drag): map pointer X to a lane column (three lanes × LANE_WIDTH) and tween the player toward that lane.
  * - Arrow keys for desktop testing
- * - Prevent lane-switch during active tween
  */
 export class LaneSystem {
   private readonly scene: Phaser.Scene;
@@ -19,9 +17,6 @@ export class LaneSystem {
 
   private currentLane = 1;
   private isSwitchingLane = false;
-
-  /** World X reference for drag-step lane changes after touchdown. */
-  private dragAnchorX = 0;
 
   private readonly onPointerDown: (pointer: Phaser.Input.Pointer) => void;
   private readonly onPointerMove: (pointer: Phaser.Input.Pointer) => void;
@@ -36,16 +31,14 @@ export class LaneSystem {
       if (pointer.rightButtonDown()) {
         return;
       }
+      this.snapCurrentLaneToNearest();
       const px = pointer.worldX;
       const cx = this.player.x;
-      if (!this.isSwitchingLane) {
-        if (px < cx) {
-          this.switchToLane(this.currentLane - 1);
-        } else if (px > cx) {
-          this.switchToLane(this.currentLane + 1);
-        }
+      if (px < cx) {
+        this.switchToLane(this.currentLane - 1);
+      } else if (px > cx) {
+        this.switchToLane(this.currentLane + 1);
       }
-      this.dragAnchorX = pointer.worldX;
     };
 
     this.onPointerMove = (pointer: Phaser.Input.Pointer) => {
@@ -55,7 +48,8 @@ export class LaneSystem {
       if (pointer.rightButtonDown()) {
         return;
       }
-      this.processDragSteps(pointer);
+      const targetLane = this.laneIndexFromWorldX(pointer.worldX);
+      this.switchToLane(targetLane);
     };
 
     this.scene.input.on('pointerdown', this.onPointerDown);
@@ -86,36 +80,43 @@ export class LaneSystem {
     this.scene.input.off('pointermove', this.onPointerMove);
   }
 
-  private processDragSteps(pointer: Phaser.Input.Pointer): void {
-    if (this.isSwitchingLane) {
-      return;
-    }
+  /** Which lane column (0…LANE_COUNT-1) contains this world X, using full lane strip width. */
+  private laneIndexFromWorldX(px: number): number {
+    const roadLeft = this.laneCenters[0] - CONFIG.LANE_WIDTH / 2;
+    return Phaser.Math.Clamp(
+      Math.floor((px - roadLeft) / CONFIG.LANE_WIDTH),
+      0,
+      CONFIG.LANE_COUNT - 1,
+    );
+  }
 
-    const step = CONFIG.LANE_DRAG_STEP_PX;
-    const px = pointer.worldX;
-    let dx = px - this.dragAnchorX;
-
-    if (dx >= step) {
-      this.switchToLane(this.currentLane + 1);
-      this.dragAnchorX += step;
-    } else if (dx <= -step) {
-      this.switchToLane(this.currentLane - 1);
-      this.dragAnchorX -= step;
-    }
+  /** Sync logical lane from player position (e.g. after killing a tween mid-flight). */
+  private snapCurrentLaneToNearest(): void {
+    this.currentLane = this.laneIndexFromWorldX(this.player.x);
   }
 
   private switchToLane(nextLane: number): void {
-    const clampedLane = Phaser.Math.Clamp(nextLane, 0, CONFIG.LANE_COUNT - 1);
-    if (clampedLane === this.currentLane) {
+    const clamped = Phaser.Math.Clamp(nextLane, 0, CONFIG.LANE_COUNT - 1);
+
+    if (clamped === this.currentLane && this.isSwitchingLane) {
+      return;
+    }
+    if (
+      clamped === this.currentLane &&
+      Math.abs(this.player.x - this.laneCenters[clamped]) < 2
+    ) {
       return;
     }
 
-    this.currentLane = clampedLane;
+    this.scene.tweens.killTweensOf(this.player);
+    this.isSwitchingLane = false;
+
+    this.currentLane = clamped;
     this.isSwitchingLane = true;
 
     this.scene.tweens.add({
       targets: this.player,
-      x: this.laneCenters[clampedLane],
+      x: this.laneCenters[clamped],
       duration: CONFIG.LANE_SWITCH_DURATION,
       ease: CONFIG.LANE_SWITCH_EASE,
       onComplete: () => {

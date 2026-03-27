@@ -282,6 +282,39 @@ The bends of the curve are now open again. They almost look like the pages of an
 
 When the user change lanes, the stream, the slipstream trail grows properly, but when it resets to normal, it almost appears to snap back to a straight line. I want it to decay from the and back until its normal position.
 
+### 68
+
+I want to change the touch controls so that Touching anywhere left of the middle of the player will swap the lane to the left if available. And touching anywhere to the right of the middle of the player will swap the lane to the right if available. This should be happening on mouse or touchdown.
+
+### 69
+
+Let's change it so the input is actually on touch move. And if the touch is anywhere to the right of the player, it'll move it. And if it's anywhere to the left of the player, it'll move it to the left. There should be a few pixel dead zone right in the middle of the player just so it doesn't flicker back and forth.
+
+### 70
+
+Something about this doesn't feel right. I just get rid of this dead zone. I just want them to be able to put their finger down and move to the left or right to trigger the lane swapping at all times.
+
+### 71
+
+Okay, let's change this again. It should be that on touchdown, if the finger is to the left or to the right of the middle of the player, then it should trigger a move in that direction. Additionally, if a move has already happened while the finger is down, then... After the move has... been triggered, if the finger moves an additional let's say 10 pixels to the right, it'll trigger a move to the right or 10 pixels to the left. It'll trigger a move to the left.
+
+### 72
+
+Okay, let's change this up again. The mouse down to the left and right of the player, that behavior is still okay. But for the dragging, let's just make it based off the three lane widths. So your finger, wherever your finger is, It'll move whatever lane you put your finger in. It'll move towards that direction.
+
+### 73
+
+also please keep updating my prompts.md
+
+---
+
+## Lane input — current behavior (`src/engine/LaneSystem.ts`)
+
+- **Pointer down** (mouse or touch): compares `pointer.worldX` to the player center — left moves one lane left, right moves one lane right (if not at edge). `snapCurrentLaneToNearest()` syncs logical lane from `player.x` before the step.
+- **Pointer move** while held: horizontal position is mapped onto the road using `CONFIG.LANE_WIDTH` strips (`roadLeft` from `laneCenters[0] - LANE_WIDTH/2`); the player tweens toward that lane index. In-flight tweens are killed when the target lane changes.
+- **Keyboard**: arrow keys still nudge one lane per key press.
+- **Config**: `LANE_SWITCH_DURATION`, `LANE_SWITCH_EASE`, `LANE_WIDTH`, `LANE_COUNT` — no separate drag-step constant (lane-band dragging replaced the older 10px-step and dead-zone experiments).
+
 ---
 
 ## Future prompts
