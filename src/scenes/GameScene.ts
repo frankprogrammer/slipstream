@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
 import { LaneSystem } from '../engine/LaneSystem';
+import { SlipstreamZone } from '../engine/SlipstreamZone';
 import { TrafficSpawner } from '../engine/TrafficSpawner';
 
 /**
@@ -28,8 +29,11 @@ export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Rectangle;
   private laneSystem!: LaneSystem;
   private trafficSpawner!: TrafficSpawner;
+  private slipstreamZone!: SlipstreamZone;
 
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
+  private draftMeterBg!: Phaser.GameObjects.Rectangle;
+  private draftMeterFill!: Phaser.GameObjects.Rectangle;
 
   private roadLeft = 0;
   private roadWidth = 0;
@@ -62,10 +66,18 @@ export class GameScene extends Phaser.Scene {
 
     this.createLaneDashes(height);
     this.createPlayer(height);
+    this.createDraftMeter();
     this.laneSystem = new LaneSystem(this, this.player, this.laneCenters);
     this.trafficSpawner = new TrafficSpawner(this, this.laneCenters);
+    this.slipstreamZone = new SlipstreamZone(
+      this,
+      this.player,
+      () => this.trafficSpawner.getVehicles(),
+      true
+    );
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.laneSystem.destroy();
+      this.slipstreamZone.destroy();
       this.trafficSpawner.destroy();
     });
   }
@@ -76,6 +88,8 @@ export class GameScene extends Phaser.Scene {
     this.laneSystem.update();
     this.scrollRoad(delta);
     this.trafficSpawner.update(delta);
+    this.slipstreamZone.update(delta);
+    this.updateDraftMeterUI();
   }
 
   private createLaneDashes(height: number): void {
@@ -102,6 +116,44 @@ export class GameScene extends Phaser.Scene {
         CONFIG.PALETTE.CORAL
       )
       .setStrokeStyle(3, CONFIG.PALETTE.CREAM);
+  }
+
+  private createDraftMeter(): void {
+    const meterWidth = 56;
+    const meterHeight = 8;
+
+    this.draftMeterBg = this.add
+      .rectangle(this.player.x, this.player.y - 62, meterWidth, meterHeight, CONFIG.PALETTE.SOFT_BROWN)
+      .setDepth(11)
+      .setVisible(false);
+
+    this.draftMeterFill = this.add
+      .rectangle(
+        this.player.x - meterWidth / 2,
+        this.player.y - 62,
+        0,
+        meterHeight - 2,
+        CONFIG.PALETTE.AMBER
+      )
+      .setOrigin(0, 0.5)
+      .setDepth(12)
+      .setVisible(false);
+  }
+
+  private updateDraftMeterUI(): void {
+    const meterWidth = this.draftMeterBg.width;
+    const meterY = this.player.y - 62;
+    const meterVisible = this.slipstreamZone.isCurrentlyDrafting();
+    const fillRatio = this.slipstreamZone.getDraftMeter();
+
+    this.draftMeterBg
+      .setPosition(this.player.x, meterY)
+      .setVisible(meterVisible);
+
+    this.draftMeterFill
+      .setPosition(this.player.x - meterWidth / 2, meterY)
+      .setSize(meterWidth * fillRatio, this.draftMeterFill.height)
+      .setVisible(meterVisible);
   }
 
   private scrollRoad(delta: number): void {

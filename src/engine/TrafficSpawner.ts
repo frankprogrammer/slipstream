@@ -68,6 +68,10 @@ export class TrafficSpawner {
     this.vehicleSpeeds = [];
   }
 
+  getVehicles(): readonly Phaser.GameObjects.Rectangle[] {
+    return this.vehicles;
+  }
+
   private getCurrentPhase(): TrafficPhase {
     let phase = CONFIG.TRAFFIC_PHASES[0];
     for (const candidate of CONFIG.TRAFFIC_PHASES) {
