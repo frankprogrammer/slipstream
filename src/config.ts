@@ -105,6 +105,16 @@ export const CONFIG = {
   // ── Draft Glow ──
   DRAFT_GLOW_PULSE_SPEED: 800, // ms per pulse cycle
 
+  // ── Player trail ribbon ──
+  /** Split long polyline edges so lane-change diagonals are sampled smoothly for the stroke. */
+  TRAIL_DENSIFY_MAX_SEGMENT_PX: 12,
+  /** Chaikin corner-cutting iterations (more = smoother polyline before stroke). */
+  TRAIL_CHAIKIN_ITERATIONS: 3,
+  /** Laplacian smooth passes on the centerline (softens sharp bends after densify). */
+  TRAIL_LAPLACIAN_SMOOTH_PASSES: 3,
+  /** After a lane switch ends, curve blend 1→0 over this duration (stops the trail snapping straight). */
+  TRAIL_CURVE_BLEND_DECAY_MS: 1400,
+
   // ── Player ──
   PLAYER_Y_POSITION: 0.8, // fraction of screen height from top (80% down = near bottom)
 

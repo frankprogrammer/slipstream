@@ -42,7 +42,8 @@ export class GameScene extends Phaser.Scene {
   private roadBg!: Phaser.GameObjects.Rectangle;
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
   private speedLines: Phaser.GameObjects.Rectangle[] = [];
-  private playerTrailGraphics!: Phaser.GameObjects.Graphics;
+  private trailCanvasTexture!: Phaser.Textures.CanvasTexture;
+  private trailImage!: Phaser.GameObjects.Image;
   private playerTrailPoints: Array<{ x: number; y: number; lifeMs: number; maxLifeMs: number }> = [];
   private scoreText!: Phaser.GameObjects.Text;
   private draftMeterBg!: Phaser.GameObjects.Rectangle;
@@ -64,6 +65,8 @@ export class GameScene extends Phaser.Scene {
   private draftGlowTween: Phaser.Tweens.Tween | null = null;
   private speedLineSpawnAccumulatorMs = 0;
   private trailSpawnAccumulatorMs = 0;
+  /** 1 = full Laplacian bend smoothing; decays after lane switch so the ribbon eases straight instead of snapping. */
+  private trailCurveBlend = 0;
   private currentChain = 0;
   private currentScrollStep: number = CONFIG.BASE_SCROLL_SPEED;
   private currentWorldSpeedBonus = 0;
@@ -98,7 +101,7 @@ export class GameScene extends Phaser.Scene {
 
     this.createLaneDashes(height);
     this.createPlayer(height);
-    this.createPlayerTrailGraphics();
+    this.createPlayerTrailCanvas();
     this.createScoreText();
     this.createDraftMeter();
     this.createChainText();
@@ -184,8 +187,18 @@ export class GameScene extends Phaser.Scene {
       .setStrokeStyle(3, THEME.TOKENS.playerOutline);
   }
 
-  private createPlayerTrailGraphics(): void {
-    this.playerTrailGraphics = this.add.graphics().setDepth(9);
+  private createPlayerTrailCanvas(): void {
+    const w = Math.ceil(this.scale.width);
+    const h = Math.ceil(this.scale.height);
+    if (this.textures.exists('playerTrailCanvas')) {
+      this.textures.remove('playerTrailCanvas');
+    }
+    const trailTex = this.textures.createCanvas('playerTrailCanvas', w, h);
+    if (!trailTex) {
+      throw new Error('Failed to create playerTrailCanvas texture');
+    }
+    this.trailCanvasTexture = trailTex;
+    this.trailImage = this.add.image(0, 0, 'playerTrailCanvas').setOrigin(0, 0).setDepth(9);
   }
 
   private createDraftMeter(): void {
@@ -477,57 +490,55 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderPlayerTrail(speedFactor: number): void {
-    this.playerTrailGraphics.clear();
+    const ctx = this.trailCanvasTexture.context;
+    const canvas = this.trailCanvasTexture.canvas;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (this.playerTrailPoints.length < 2) {
+      this.trailCanvasTexture.refresh();
       return;
     }
 
     const smoothed = this.buildSmoothedTrailPoints(this.playerTrailPoints);
     if (smoothed.length < 2) {
+      this.trailCanvasTexture.refresh();
       return;
     }
 
-    const n = smoothed.length;
+    const dense = this.densifyPolyline(smoothed, CONFIG.TRAIL_DENSIFY_MAX_SEGMENT_PX);
+    const ribbon = this.blendDenseWithLaplacianSmooth(dense, this.trailCurveBlend);
+    const n = ribbon.length;
     const headWidth = this.player.width * 0.75;
     const tailWidth = this.player.width * 0.25;
     const overallAlpha = Phaser.Math.Clamp(0.7 + (speedFactor - 1) * 0.2, 0.7, 1);
+    const colorInt = this.getPlayerTrailFillColor();
+    const rgb = Phaser.Display.Color.IntegerToColor(colorInt);
 
-    for (let i = 0; i < n - 1; i += 1) {
-      const p0 = smoothed[i];
-      const p1 = smoothed[i + 1];
-      const prev = smoothed[Math.max(0, i - 1)];
-      const next = smoothed[Math.min(n - 1, i + 2)];
+    ctx.save();
+    // One continuous stroke so round joins close corners (segment+butt strokes leave wedge gaps — “open book”).
+    // Canvas 2D can’t vary line width along one path; approximate taper with alpha gradient + width between head/tail.
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(2, Phaser.Math.Linear(headWidth, tailWidth, 0.42));
 
-      const tangent0 = new Phaser.Math.Vector2(p1.x - prev.x, p1.y - prev.y).normalize();
-      const tangent1 = new Phaser.Math.Vector2(next.x - p0.x, next.y - p0.y).normalize();
-      const normal0 = new Phaser.Math.Vector2(-tangent0.y, tangent0.x);
-      const normal1 = new Phaser.Math.Vector2(-tangent1.y, tangent1.x);
+    const hx = ribbon[0].x;
+    const hy = ribbon[0].y;
+    const tx = ribbon[n - 1].x;
+    const ty = ribbon[n - 1].y;
+    const grad = ctx.createLinearGradient(hx, hy, tx, ty);
+    grad.addColorStop(0, `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha})`);
+    grad.addColorStop(1, `rgba(${rgb.red},${rgb.green},${rgb.blue},${overallAlpha * 0.04})`);
+    ctx.strokeStyle = grad;
 
-      const t0 = i / (n - 1);
-      const t1 = (i + 1) / (n - 1);
-      const width0 = Phaser.Math.Linear(headWidth, tailWidth, t0);
-      const width1 = Phaser.Math.Linear(headWidth, tailWidth, t1);
-
-      const l0 = new Phaser.Math.Vector2(p0.x + normal0.x * (width0 * 0.5), p0.y + normal0.y * (width0 * 0.5));
-      const r0 = new Phaser.Math.Vector2(p0.x - normal0.x * (width0 * 0.5), p0.y - normal0.y * (width0 * 0.5));
-      const l1 = new Phaser.Math.Vector2(p1.x + normal1.x * (width1 * 0.5), p1.y + normal1.y * (width1 * 0.5));
-      const r1 = new Phaser.Math.Vector2(p1.x - normal1.x * (width1 * 0.5), p1.y - normal1.y * (width1 * 0.5));
-
-      // Fade from fully opaque at the start to fully transparent at the end.
-      const segmentAlpha = overallAlpha * (1 - (t0 + t1) * 0.5);
-      this.playerTrailGraphics.fillStyle(
-        this.getPlayerTrailFillColor(),
-        Phaser.Math.Clamp(segmentAlpha, 0, 1)
-      );
-      this.playerTrailGraphics.beginPath();
-      this.playerTrailGraphics.moveTo(l0.x, l0.y);
-      this.playerTrailGraphics.lineTo(l1.x, l1.y);
-      this.playerTrailGraphics.lineTo(r1.x, r1.y);
-      this.playerTrailGraphics.lineTo(r0.x, r0.y);
-      this.playerTrailGraphics.closePath();
-      this.playerTrailGraphics.fillPath();
+    ctx.beginPath();
+    ctx.moveTo(ribbon[0].x, ribbon[0].y);
+    for (let i = 1; i < n; i += 1) {
+      ctx.lineTo(ribbon[i].x, ribbon[i].y);
     }
+    ctx.stroke();
+    ctx.restore();
+
+    this.trailCanvasTexture.refresh();
   }
 
   /** While actively drafting, pulse trail color between base blue and teal (same timing as draft vehicle glow). */
@@ -551,6 +562,69 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  /** Insert points along long edges so ribbon tangents don’t jump (lane-change diagonals). */
+  private densifyPolyline(points: Phaser.Math.Vector2[], maxSegLen: number): Phaser.Math.Vector2[] {
+    if (points.length < 2) {
+      return points;
+    }
+    const out: Phaser.Math.Vector2[] = [];
+    out.push(points[0].clone());
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const steps = Math.max(1, Math.ceil(dist / maxSegLen));
+      for (let s = 1; s <= steps; s += 1) {
+        const t = s / steps;
+        out.push(new Phaser.Math.Vector2(Phaser.Math.Linear(a.x, b.x, t), Phaser.Math.Linear(a.y, b.y, t)));
+      }
+    }
+    return out;
+  }
+
+  /** Blend densified polyline (straighter in-lane) with Laplacian-smoothed (full bend). */
+  private blendDenseWithLaplacianSmooth(
+    dense: Phaser.Math.Vector2[],
+    blend: number
+  ): Phaser.Math.Vector2[] {
+    if (blend <= 0) {
+      return dense;
+    }
+    const smooth = this.smoothRibbonLaplacian(
+      dense.map((p) => p.clone()),
+      CONFIG.TRAIL_LAPLACIAN_SMOOTH_PASSES
+    );
+    if (blend >= 1) {
+      return smooth;
+    }
+    return dense.map((p, i) => {
+      const s = smooth[i];
+      return new Phaser.Math.Vector2(
+        Phaser.Math.Linear(p.x, s.x, blend),
+        Phaser.Math.Linear(p.y, s.y, blend)
+      );
+    });
+  }
+
+  /** Light smoothing of the centerline to soften lane-change corners (no sharp kinks). */
+  private smoothRibbonLaplacian(points: Phaser.Math.Vector2[], passes: number): Phaser.Math.Vector2[] {
+    if (passes < 1 || points.length < 3) {
+      return points;
+    }
+    let cur = points.map((p) => p.clone());
+    for (let p = 0; p < passes; p += 1) {
+      const next = cur.map((v) => v.clone());
+      for (let i = 1; i < cur.length - 1; i += 1) {
+        next[i].x = 0.25 * cur[i - 1].x + 0.5 * cur[i].x + 0.25 * cur[i + 1].x;
+        next[i].y = 0.25 * cur[i - 1].y + 0.5 * cur[i].y + 0.25 * cur[i + 1].y;
+      }
+      cur = next;
+    }
+    return cur;
+  }
+
   private buildSmoothedTrailPoints(
     points: Array<{ x: number; y: number; lifeMs: number; maxLifeMs: number }>
   ): Phaser.Math.Vector2[] {
@@ -560,7 +634,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Chaikin smoothing keeps the curve smooth without Catmull overshoot/self-intersections.
-    const iterations = 2;
+    const iterations = CONFIG.TRAIL_CHAIKIN_ITERATIONS;
     for (let iter = 0; iter < iterations; iter += 1) {
       const next: Phaser.Math.Vector2[] = [smoothed[0].clone()];
       for (let i = 0; i < smoothed.length - 1; i += 1) {
@@ -664,6 +738,7 @@ export class GameScene extends Phaser.Scene {
     this.activeDraftVehicle = null;
     this.speedLineSpawnAccumulatorMs = 0;
     this.trailSpawnAccumulatorMs = 0;
+    this.trailCurveBlend = 0;
     this.currentChain = 0;
     this.currentScrollStep = CONFIG.BASE_SCROLL_SPEED;
     this.currentWorldSpeedBonus = 0;
@@ -671,7 +746,12 @@ export class GameScene extends Phaser.Scene {
 
   private clearPlayerTrail(): void {
     this.playerTrailPoints = [];
-    this.playerTrailGraphics?.clear();
+    if (this.trailCanvasTexture) {
+      const ctx = this.trailCanvasTexture.context;
+      const canvas = this.trailCanvasTexture.canvas;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      this.trailCanvasTexture.refresh();
+    }
   }
 }
 

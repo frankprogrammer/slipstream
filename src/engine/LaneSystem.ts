@@ -80,6 +80,11 @@ export class LaneSystem {
     }
   }
 
+  /** True while the lane-change tween is running. */
+  isLaneSwitchActive(): boolean {
+    return this.isSwitchingLane;
+  }
+
   destroy(): void {
     this.scene.input.off('pointerdown', this.onPointerDown);
     this.scene.input.off('pointerup', this.onPointerUp);

@@ -258,6 +258,30 @@ can we make the aspect ratio of the game 9:19.5 so it remebles phones better
 
 the game is also off centered to the right.
 
+### 62
+
+Right now when different segments of the trail overlap, the opacity visually changes. I want the trail to always have a smooth opacity through all segments with no overlap.
+
+### 63
+
+I am still seeing the transparent overlap, specifically when changing lanes at the curve of the ribbon. When you are moving straight, there is no overlap.
+
+### 64
+
+This is still not correct. It looks like the bends are making a sharp break and I am still visually seeing overlap.
+
+### 65
+
+there is no overlap now which is great, but i do want it to taper from start to end like it was before
+
+### 66
+
+The bends of the curve are now open again. They almost look like the pages of an open book. Spread out. I think there is overlap again.
+
+### 67
+
+When the user change lanes, the stream, the slipstream trail grows properly, but when it resets to normal, it almost appears to snap back to a straight line. I want it to decay from the and back until its normal position.
+
 ---
 
 ## Future prompts
