@@ -37,11 +37,15 @@ export class GameScene extends Phaser.Scene {
   private scoreManager!: ScoreManager;
   private collisionSystem!: CollisionSystem;
 
+  private skyBg!: Phaser.GameObjects.Rectangle;
+  private roadBg!: Phaser.GameObjects.Rectangle;
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
+  private speedLines: Phaser.GameObjects.Rectangle[] = [];
   private scoreText!: Phaser.GameObjects.Text;
   private draftMeterBg!: Phaser.GameObjects.Rectangle;
   private draftMeterFill!: Phaser.GameObjects.Rectangle;
   private chainText!: Phaser.GameObjects.Text;
+  private flashOverlay!: Phaser.GameObjects.Rectangle;
 
   private roadLeft = 0;
   private roadWidth = 0;
@@ -49,6 +53,10 @@ export class GameScene extends Phaser.Scene {
   private readonly dashGap = 28;
   private burstRemainingMs = 0;
   private isRunOver = false;
+  private isDraftFxActive = false;
+  private activeDraftVehicle: Phaser.GameObjects.Rectangle | null = null;
+  private draftGlowTween: Phaser.Tweens.Tween | null = null;
+  private speedLineSpawnAccumulatorMs = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -73,8 +81,10 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Warm sunset shoulder color around the road.
-    this.add.rectangle(width / 2, height / 2, width, height, CONFIG.PALETTE.PEACH).setDepth(-3);
-    this.add.rectangle(width / 2, height / 2, this.roadWidth, height, CONFIG.PALETTE.WARM_GRAY).setDepth(-2);
+    this.skyBg = this.add.rectangle(width / 2, height / 2, width, height, CONFIG.PALETTE.PEACH).setDepth(-3);
+    this.roadBg = this.add
+      .rectangle(width / 2, height / 2, this.roadWidth, height, CONFIG.PALETTE.WARM_GRAY)
+      .setDepth(-2);
 
     this.createLaneDashes(height);
     this.createPlayer(height);
@@ -98,16 +108,24 @@ export class GameScene extends Phaser.Scene {
       () => this.handleCollision()
     );
     this.events.on('draft-complete', this.handleDraftComplete, this);
+    this.events.on('draft-start', this.handleDraftStart, this);
+    this.events.on('draft-cancel', this.handleDraftEnd, this);
     this.events.on('chain-changed', this.handleChainChanged, this);
+    this.events.on('chain-milestone', this.handleChainMilestone, this);
     this.events.on('score-changed', this.handleScoreChanged, this);
+    this.createFlashOverlay();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off('draft-complete', this.handleDraftComplete, this);
+      this.events.off('draft-start', this.handleDraftStart, this);
+      this.events.off('draft-cancel', this.handleDraftEnd, this);
       this.events.off('chain-changed', this.handleChainChanged, this);
+      this.events.off('chain-milestone', this.handleChainMilestone, this);
       this.events.off('score-changed', this.handleScoreChanged, this);
       this.laneSystem.destroy();
       this.collisionSystem.destroy();
       this.slipstreamZone.destroy();
       this.trafficSpawner.destroy();
+      this.clearDraftEffects();
     });
   }
 
@@ -120,6 +138,8 @@ export class GameScene extends Phaser.Scene {
     this.slipstreamZone.update(delta);
     this.collisionSystem.update();
     this.chainManager.update(delta, this.slipstreamZone.isCurrentlyDrafting());
+    this.updateSpeedLines(delta);
+    this.updateSkyGradient();
     this.updateDraftMeterUI();
   }
 
@@ -195,6 +215,14 @@ export class GameScene extends Phaser.Scene {
       .setShadow(0, 2, '#4A3F35', 4, false, true);
   }
 
+  private createFlashOverlay(): void {
+    this.flashOverlay = this.add
+      .rectangle(this.scale.width / 2, this.scale.height / 2, this.scale.width, this.scale.height, 0xF5A623)
+      .setDepth(40)
+      .setAlpha(0)
+      .setVisible(false);
+  }
+
   private updateDraftMeterUI(): void {
     const meterWidth = this.draftMeterBg.width;
     const meterY = this.player.y - 62;
@@ -231,6 +259,7 @@ export class GameScene extends Phaser.Scene {
     const chain = this.chainManager.completeDraft();
     this.scoreManager.addDraftCompleteBonus(chain);
     this.burstRemainingMs = CONFIG.SLINGSHOT_BURST_DURATION;
+    this.handleDraftEnd();
 
     this.tweens.add({
       targets: this.player,
@@ -257,6 +286,123 @@ export class GameScene extends Phaser.Scene {
     this.scoreText.setText(`${Math.floor(score)}`);
   }
 
+  private handleDraftStart(vehicle: Phaser.GameObjects.Rectangle): void {
+    this.clearDraftEffects();
+    this.isDraftFxActive = true;
+    this.activeDraftVehicle = vehicle;
+    vehicle.setStrokeStyle(4, CONFIG.DRAFT_GLOW_COLOR);
+    this.draftGlowTween = this.tweens.add({
+      targets: vehicle,
+      alpha: 0.7,
+      duration: CONFIG.DRAFT_GLOW_PULSE_SPEED / 2,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
+  }
+
+  private handleDraftEnd(): void {
+    this.clearDraftEffects();
+  }
+
+  private clearDraftEffects(): void {
+    this.isDraftFxActive = false;
+    this.speedLineSpawnAccumulatorMs = 0;
+
+    for (const line of this.speedLines) {
+      line.destroy();
+    }
+    this.speedLines = [];
+
+    this.draftGlowTween?.stop();
+    this.draftGlowTween = null;
+    if (this.activeDraftVehicle?.active) {
+      this.activeDraftVehicle.setAlpha(1);
+      this.activeDraftVehicle.setStrokeStyle(2, CONFIG.PALETTE.CREAM);
+    }
+    this.activeDraftVehicle = null;
+  }
+
+  private updateSpeedLines(delta: number): void {
+    const speedScale = delta / (1000 / 60);
+    const speedLineVelocity = 12 * speedScale;
+
+    for (let i = this.speedLines.length - 1; i >= 0; i -= 1) {
+      const line = this.speedLines[i];
+      line.y += speedLineVelocity;
+      line.alpha = Math.max(0, line.alpha - 0.025 * speedScale);
+      if (line.y - line.height / 2 > this.scale.height + 24 || line.alpha <= 0) {
+        line.destroy();
+        this.speedLines.splice(i, 1);
+      }
+    }
+
+    if (!this.isDraftFxActive) {
+      return;
+    }
+
+    this.speedLineSpawnAccumulatorMs += delta;
+    while (this.speedLineSpawnAccumulatorMs >= CONFIG.SPEED_LINES_FREQUENCY) {
+      this.speedLineSpawnAccumulatorMs -= CONFIG.SPEED_LINES_FREQUENCY;
+      this.spawnSpeedLine();
+    }
+  }
+
+  private spawnSpeedLine(): void {
+    const fromLeft = Math.random() < 0.5;
+    const x = fromLeft
+      ? Phaser.Math.Between(6, Math.max(8, this.roadLeft - 4))
+      : Phaser.Math.Between(
+          Math.min(this.scale.width - 8, this.roadLeft + this.roadWidth + 4),
+          this.scale.width - 6
+        );
+    const y = Phaser.Math.Between(0, this.scale.height - 120);
+    const line = this.add
+      .rectangle(x, y, Phaser.Math.Between(2, 4), Phaser.Math.Between(18, 34), CONFIG.PALETTE.CREAM)
+      .setDepth(14)
+      .setAlpha(CONFIG.SPEED_LINES_BASE_ALPHA);
+    this.speedLines.push(line);
+  }
+
+  private handleChainMilestone(milestone: number): void {
+    if (milestone !== 10) {
+      return;
+    }
+
+    this.tweens.killTweensOf(this.flashOverlay);
+    this.flashOverlay.setVisible(true).setAlpha(0.45);
+    this.tweens.add({
+      targets: this.flashOverlay,
+      alpha: 0,
+      duration: CONFIG.SCREEN_FLASH_DURATION,
+      ease: 'Quad.Out',
+      onComplete: () => {
+        this.flashOverlay.setVisible(false);
+      },
+    });
+  }
+
+  private updateSkyGradient(): void {
+    const distance = this.scoreManager.getDistancePx();
+    const segmentLength = CONFIG.SKY_TRANSITION_DISTANCE;
+    const colorCount = CONFIG.SKY_GRADIENT_COLORS.length;
+
+    if (colorCount < 2) {
+      return;
+    }
+
+    const phase = distance / segmentLength;
+    const fromIndex = Phaser.Math.Clamp(Math.floor(phase) % colorCount, 0, colorCount - 1);
+    const toIndex = Math.min(fromIndex + 1, colorCount - 1);
+    const t = Phaser.Math.Clamp(phase - Math.floor(phase), 0, 1);
+
+    const from = Phaser.Display.Color.HexStringToColor(CONFIG.SKY_GRADIENT_COLORS[fromIndex]);
+    const to = Phaser.Display.Color.HexStringToColor(CONFIG.SKY_GRADIENT_COLORS[toIndex]);
+    const lerped = Phaser.Display.Color.Interpolate.ColorWithColor(from, to, 1, t);
+    const colorValue = Phaser.Display.Color.GetColor(lerped.r, lerped.g, lerped.b);
+    this.skyBg.setFillStyle(colorValue, 1);
+  }
+
   private handleCollision(): void {
     if (this.isRunOver) {
       return;
@@ -274,5 +420,8 @@ export class GameScene extends Phaser.Scene {
   private resetRunState(): void {
     this.isRunOver = false;
     this.burstRemainingMs = 0;
+    this.isDraftFxActive = false;
+    this.activeDraftVehicle = null;
+    this.speedLineSpawnAccumulatorMs = 0;
   }
 }
