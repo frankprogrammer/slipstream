@@ -12,30 +12,35 @@
  * 4. Point main.ts to the new manifest
  */
 export const SKIN_MANIFEST = {
-  name: 'Cozy Nostalgia — Countryside Highway',
+  name: 'Tokyo Night — Neon Drift',
 
   // ── Color Palette ──
   palette: {
-    primary: '#D4762C', // amber
-    secondary: '#E8956A', // peach
-    accent: '#D4836A', // coral
-    background: '#FFF8F0', // cream
-    shadow: '#4A3F35', // warm gray
-    text: '#4A3F35',
-    textLight: '#7A6B5D', // soft brown
+    primary: '#7AA2F7', // blue
+    secondary: '#7DCFFF', // cyan
+    accent: '#BB9AF7', // purple
+    background: '#1A1B26', // editor background
+    shadow: '#16161E', // panel/deep shadow
+    text: '#C0CAF5', // main foreground
+    textLight: '#787C99', // muted foreground
 
-    // Explicit runtime aliases for engine/scenes.
-    amber: '#D4762C',
-    peach: '#E8956A',
-    coral: '#D4836A',
-    cream: '#FFF8F0',
-    warmGray: '#4A3F35',
-    softBrown: '#7A6B5D',
-    dustyRose: '#9B6B8A',
-    twilight: '#5C4B7A',
+    // Tokyo Night aliases using closest human-readable color names.
+    cornflowerBlue: '#7AA2F7', // approx common name
+    lightSkyBlue: '#7DCFFF', // approx common name
+    lavenderViolet: '#BB9AF7', // approximate
+    electricCyan: '#2AC3DE', // bright cyan/robin-egg style
+    aquamarine: '#73DACA', // bright mint-cyan
+    pastelGreen: '#9ECE6A', // bright green
+    mutedOrange: '#E0AF68', // approximate
+    rosePink: '#F7768E', // approximate
+    verySoftBlue: '#C0CAF5', // approximate
+    slateBlueGray: '#787C99', // approximate
+    eigengrau: '#1E202E', // very dark bluish gray
+    charcoalBlue: '#363B54', // approximate
+    royalBlue: '#3D59A1', // approximate
   },
 
-  skyGradient: ['#D4762C', '#E8956A', '#D4836A', '#9B6B8A', '#5C4B7A'],
+  skyGradient: ['#1A1B26', '#3D59A1', '#7AA2F7', '#BB9AF7', '#73DACA', '#9ECE6A'],
 
   // ── Sprite Assets ──
   // For prototype: use null (engine draws placeholder rectangles)
