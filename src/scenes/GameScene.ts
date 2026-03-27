@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../config';
 import { ChainManager } from '../engine/ChainManager';
+import { CollisionSystem } from '../engine/CollisionSystem';
 import { LaneSystem } from '../engine/LaneSystem';
 import { ScoreManager } from '../engine/ScoreManager';
 import { SlipstreamZone } from '../engine/SlipstreamZone';
@@ -34,6 +35,7 @@ export class GameScene extends Phaser.Scene {
   private slipstreamZone!: SlipstreamZone;
   private chainManager!: ChainManager;
   private scoreManager!: ScoreManager;
+  private collisionSystem!: CollisionSystem;
 
   private roadDashes: Phaser.GameObjects.Rectangle[] = [];
   private scoreText!: Phaser.GameObjects.Text;
@@ -46,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   private readonly dashLength = 36;
   private readonly dashGap = 28;
   private burstRemainingMs = 0;
+  private isRunOver = false;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -57,6 +60,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.resetRunState();
+
     const width = this.scale.width;
     const height = this.scale.height;
 
@@ -86,6 +91,12 @@ export class GameScene extends Phaser.Scene {
       () => this.trafficSpawner.getVehicles(),
       true
     );
+    this.collisionSystem = new CollisionSystem(
+      this,
+      this.player,
+      () => this.trafficSpawner.getVehicles(),
+      () => this.handleCollision()
+    );
     this.events.on('draft-complete', this.handleDraftComplete, this);
     this.events.on('chain-changed', this.handleChainChanged, this);
     this.events.on('score-changed', this.handleScoreChanged, this);
@@ -94,6 +105,7 @@ export class GameScene extends Phaser.Scene {
       this.events.off('chain-changed', this.handleChainChanged, this);
       this.events.off('score-changed', this.handleScoreChanged, this);
       this.laneSystem.destroy();
+      this.collisionSystem.destroy();
       this.slipstreamZone.destroy();
       this.trafficSpawner.destroy();
     });
@@ -106,6 +118,7 @@ export class GameScene extends Phaser.Scene {
     this.scrollRoad(delta);
     this.trafficSpawner.update(delta);
     this.slipstreamZone.update(delta);
+    this.collisionSystem.update();
     this.chainManager.update(delta, this.slipstreamZone.isCurrentlyDrafting());
     this.updateDraftMeterUI();
   }
@@ -242,5 +255,24 @@ export class GameScene extends Phaser.Scene {
 
   private handleScoreChanged(score: number): void {
     this.scoreText.setText(`${Math.floor(score)}`);
+  }
+
+  private handleCollision(): void {
+    if (this.isRunOver) {
+      return;
+    }
+
+    this.isRunOver = true;
+    this.chainManager.resetChain('collision');
+    this.scene.start('GameOverScene', {
+      score: Math.floor(this.scoreManager.getScore()),
+      bestChain: this.chainManager.getBestChain(),
+      distance: Math.floor(this.scoreManager.getDistancePx()),
+    });
+  }
+
+  private resetRunState(): void {
+    this.isRunOver = false;
+    this.burstRemainingMs = 0;
   }
 }

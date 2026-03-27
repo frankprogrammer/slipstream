@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import { CONFIG } from '../config';
 
 /**
@@ -15,5 +16,47 @@ import { CONFIG } from '../config';
  * 4. Total time from collision to GameOverScene visible: < 500ms
  */
 export class CollisionSystem {
-  // TODO: Implement
+  private readonly scene: Phaser.Scene;
+  private readonly player: Phaser.GameObjects.Rectangle;
+  private readonly getTrafficVehicles: () => readonly Phaser.GameObjects.Rectangle[];
+  private readonly onCollision: () => void;
+
+  private readonly playerBounds = new Phaser.Geom.Rectangle();
+  private readonly vehicleBounds = new Phaser.Geom.Rectangle();
+  private collided = false;
+
+  constructor(
+    scene: Phaser.Scene,
+    player: Phaser.GameObjects.Rectangle,
+    getTrafficVehicles: () => readonly Phaser.GameObjects.Rectangle[],
+    onCollision: () => void
+  ) {
+    this.scene = scene;
+    this.player = player;
+    this.getTrafficVehicles = getTrafficVehicles;
+    this.onCollision = onCollision;
+  }
+
+  update(): void {
+    if (this.collided) {
+      return;
+    }
+
+    this.player.getBounds(this.playerBounds);
+    for (const vehicle of this.getTrafficVehicles()) {
+      vehicle.getBounds(this.vehicleBounds);
+      if (!Phaser.Geom.Intersects.RectangleToRectangle(this.playerBounds, this.vehicleBounds)) {
+        continue;
+      }
+
+      this.collided = true;
+      this.scene.cameras.main.shake(30, 0.002);
+      this.onCollision();
+      return;
+    }
+  }
+
+  destroy(): void {
+    this.collided = true;
+  }
 }

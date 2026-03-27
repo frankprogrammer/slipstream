@@ -17,27 +17,83 @@ interface RunData {
 }
 
 export class GameOverScene extends Phaser.Scene {
+  private runData: RunData = {
+    score: 0,
+    bestChain: 0,
+    distance: 0,
+  };
+
   constructor() {
     super({ key: 'GameOverScene' });
   }
 
   init(data: RunData): void {
-    // TODO: Receive run data from GameScene
-    console.log('GameOver — Score:', data.score, 'Chain:', data.bestChain, 'Distance:', data.distance);
+    this.runData = {
+      score: data?.score ?? 0,
+      bestChain: data?.bestChain ?? 0,
+      distance: data?.distance ?? 0,
+    };
   }
 
   create(): void {
-    // TODO: Layout in this order:
-    // 1. Sky gradient background (frozen at the color the run ended on)
-    // 2. Final score (large, center, top third)
-    // 3. Stats row: best chain | distance
-    // 4. Personal best comparison (if new high score, celebrate)
-    // 5. Retry button (giant, center screen — this is the most important element)
-    // 6. Share button (smaller, below retry)
+    const { width, height } = this.scale;
 
-    // Retry button — tap to restart instantly
-    // this.input.once('pointerdown', () => this.scene.start('GameScene'));
+    this.add.rectangle(width / 2, height / 2, width, height, CONFIG.PALETTE.TWILIGHT);
 
-    console.log('GameOverScene created — implement me! See CLAUDE.md for specs.');
+    this.add
+      .text(width / 2, height * 0.17, 'GAME OVER', {
+        fontFamily: 'Arial',
+        fontSize: '38px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(width / 2, height * 0.28, `${this.runData.score}`, {
+        fontFamily: 'Arial',
+        fontSize: '72px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(width / 2, height * 0.38, 'SCORE', {
+        fontFamily: 'Arial',
+        fontSize: '22px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.9);
+
+    this.add
+      .text(
+        width / 2,
+        height * 0.47,
+        `BEST CHAIN x${this.runData.bestChain}   |   DIST ${this.runData.distance}`,
+        {
+          fontFamily: 'Arial',
+          fontSize: '20px',
+          color: '#FFF8F0',
+        }
+      )
+      .setOrigin(0.5)
+      .setAlpha(0.95);
+
+    const retry = this.add
+      .rectangle(width / 2, height * 0.62, 220, 72, CONFIG.PALETTE.AMBER)
+      .setStrokeStyle(3, CONFIG.PALETTE.CREAM)
+      .setInteractive({ useHandCursor: true });
+
+    this.add
+      .text(retry.x, retry.y, 'RETRY', {
+        fontFamily: 'Arial',
+        fontSize: '34px',
+        color: '#FFF8F0',
+      })
+      .setOrigin(0.5);
+
+    retry.on('pointerdown', () => {
+      this.scene.start('GameScene');
+    });
   }
 }
